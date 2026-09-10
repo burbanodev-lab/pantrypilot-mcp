@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "smoke": "tsx scripts/mcp-smoke.ts",
+    "mcp-conformance": "tsx scripts/mcp-conformance.ts",
     "judge-check": "tsx scripts/judge-check.ts",
     "demo": "tsx scripts/demo-flow.ts",
     "dev": "tsx src/server.ts",
