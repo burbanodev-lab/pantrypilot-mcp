@@ -38,6 +38,11 @@ jobs:
       - name: TypeScript build
         run: npm run build
 
+      - name: Raw MCP Streamable HTTP conformance
+        run: npm run mcp-conformance
+        env:
+          BEDROCK_ENABLED: "false"
+
       - name: Judge readiness checks
         run: npm run judge-check
         env:
