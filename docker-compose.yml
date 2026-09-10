@@ -8,6 +8,12 @@ services:
       PORT: "3000"
       # Include compose hostname / localhost for Host header validation
       ALLOWED_HOSTS: "localhost,127.0.0.1,::1,pantrypilot-mcp"
+      # Optional Bedrock (pass via host env / secrets — never bake keys into the image)
+      AWS_REGION: "${AWS_REGION:-}"
+      BEDROCK_MODEL_ID: "${BEDROCK_MODEL_ID:-}"
+      AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
+      AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
+      AWS_SESSION_TOKEN: "${AWS_SESSION_TOKEN:-}"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 10s
