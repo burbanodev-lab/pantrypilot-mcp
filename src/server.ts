@@ -8,8 +8,26 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
+import express from 'express';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { existsSync } from 'node:fs';
 import { initDatabase, persistDatabaseNow, resolveDatabasePath } from './db.js';
 import { registerTools } from './tools.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+/** Resolve companion static dir (dev: ../apps/companion, prod: ../apps/companion next to dist). */
+function resolveCompanionDir(): string | null {
+  const candidates = [
+    join(__dirname, '..', 'apps', 'companion'),
+    join(process.cwd(), 'apps', 'companion')
+  ];
+  for (const c of candidates) {
+    if (existsSync(join(c, 'index.html'))) return c;
+  }
+  return null;
+}
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '127.0.0.1';
@@ -47,9 +65,18 @@ export function createApp() {
       ok: true,
       name: 'pantrypilot-mcp',
       protocol: '2025-11-25',
-      databasePath: resolveDatabasePath()
+      databasePath: resolveDatabasePath(),
+      companion: '/companion/'
     });
   });
+
+  const companionDir = resolveCompanionDir();
+  if (companionDir) {
+    app.use('/companion', express.static(companionDir, { index: 'index.html' }));
+    app.get('/', (_req, res) => {
+      res.redirect(302, '/companion/');
+    });
+  }
 
   const mcpHandler = async (req: Request, res: Response) => {
     try {
@@ -142,6 +169,11 @@ export async function startServer(
       console.log(
         `PantryPilot MCP Streamable HTTP listening on http://${host}:${actualPort}/mcp (protocol 2025-11-25)`
       );
+      if (resolveCompanionDir()) {
+        console.log(
+          `Companion UI: http://${host}:${actualPort}/companion/`
+        );
+      }
       resolve({ port: actualPort, host });
     });
 

@@ -1,0 +1,73 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PantryPilot Companion</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <header class="top">
+    <div>
+      <h1>PantryPilot</h1>
+      <p class="tag">MCP kitchen companion — pantry → meal → cart</p>
+    </div>
+    <div class="status" id="connStatus" data-state="idle">Idle</div>
+  </header>
+
+  <main class="layout">
+    <section class="panel controls">
+      <h2>Demo controls</h2>
+      <label>
+        MCP URL
+        <input id="mcpUrl" type="url" value="/mcp" autocomplete="off" />
+      </label>
+      <label>
+        Household ID
+        <input id="householdId" type="text" value="demo" autocomplete="off" />
+      </label>
+      <label>
+        Days
+        <input id="days" type="number" min="1" max="14" value="3" />
+      </label>
+      <label>
+        Goal
+        <select id="goal">
+          <option value="weekly">weekly</option>
+          <option value="use_expiring">use_expiring</option>
+        </select>
+      </label>
+      <label>
+        Budget (cents, optional)
+        <input id="budgetCents" type="number" min="0" placeholder="e.g. 4500" />
+      </label>
+      <div class="actions">
+        <button type="button" id="btnStock">Stock sample pantry</button>
+        <button type="button" id="btnRun" class="primary">Run weekly kitchen</button>
+      </div>
+      <p class="hint">
+        Same-origin default <code>/mcp</code>. For a remote server, paste its
+        <code>…/mcp</code> URL (CORS must allow this origin).
+      </p>
+      <pre id="log" class="log" aria-live="polite"></pre>
+    </section>
+
+    <section class="panel">
+      <h2>Agent steps</h2>
+      <ol id="steps" class="steps"></ol>
+      <div id="summary" class="summary"></div>
+    </section>
+
+    <section class="panel span-2">
+      <h2>Media cards</h2>
+      <div id="cards" class="cards"></div>
+    </section>
+  </main>
+
+  <footer class="foot">
+    <span>GenAI Open Agent prep · no secrets · mock cart only</span>
+    <a href="/health">/health</a>
+  </footer>
+  <script type="module" src="./app.js"></script>
+</body>
+</html>

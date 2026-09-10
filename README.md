@@ -15,6 +15,8 @@ AWS credentials are **optional**. Without `AWS_REGION` + `BEDROCK_MODEL_ID`, `me
 - **Scored branch:** `genai/open-agent-2026`
 - **Durable memory:** SQLite via `sql.js` at `DATABASE_PATH` (default `./data/pantrypilot.sqlite`)
 - **Agent entrypoint:** MCP tool `kitchen_run`
+- **Companion UI:** `apps/companion` served at `/companion/` (static MCP client + media cards)
+- **Evals / failure modes:** `npm run eval` · [`FAILURE_MODES.md`](./FAILURE_MODES.md)
 - **One-command:** `docker compose up --build` (volume `pantrypilot-data` mounts `/data`)
 
 ## Architecture
@@ -42,8 +44,10 @@ Alexa+ / MCP client
 
 | Layer | Role |
 |-------|------|
-| `src/server.ts` | Entry: Streamable HTTP, session map, `/mcp` + `/health` |
+| `src/server.ts` | Entry: Streamable HTTP, session map, `/mcp` + `/health` + `/companion/` |
 | `src/tools.ts` | Eleven MCP tools (incl. `kitchen_run`) |
+| `apps/companion/` | Minimal web companion (HTML/JS) calling `kitchen_run` + rendering `mediaCard`s |
+| `evals/` | Scripted happy-path + soft-failure eval (`npm run eval`) |
 | `src/state.ts` / `src/db.ts` | Household pantry / prefs / plan / cart + SQLite durability + `MediaCard` types |
 | `src/meals.ts` | Deterministic meal-plan stub + slot enrichment |
 | `src/bedrock.ts` | Optional Bedrock Converse meal_plan path |
@@ -139,16 +143,32 @@ Expected output includes:
 
 Against an already-running server you can also point a custom client at `http://127.0.0.1:3000/mcp` using `@modelcontextprotocol/sdk` `Client` + `StreamableHTTPClientTransport`.
 
-## Demo script (Alexa+)
+## Companion UI + evals
+
+```bash
+npm start
+# open http://127.0.0.1:3000/companion/
+# Stock sample pantry → Run weekly kitchen → media cards
+
+npm run eval
+# PASS happy_path_pantry_meal_cart
+# PASS failure_cart_confirm_without_draft
+```
+
+See [`FAILURE_MODES.md`](./FAILURE_MODES.md) for judge-oriented failure documentation.
+
+## Demo script
+
+**Preferred (GenAI / companion):** open `/companion/` → Stock sample pantry → **Run weekly kitchen** (`kitchen_run`).
+
+**Tool-by-tool (Alexa+ / MCP client):**
 
 1. **Warm start** — `session_recall` with `householdId: "demo"`.
 2. **Stock the pantry** — `pantry_upsert` eggs, milk, rice.
 3. **Prefs** — `prefs_set` `{ diet: ["omnivore"], servings: 2 }`.
-4. **Plan** — `meal_plan` `{ days: 3 }` → breakfast/lunch/dinner with `mediaCard`s (`source` is `stub` or `bedrock`).
-5. **Shop** — `shop_list_build` → gaps not covered by pantry.
-6. **Discover** — `product_search` `{ query: "chicken" }` → Alexa-ready `mediaCard`s.
-7. **Cart** — `cart_draft` then `cart_confirm` → mock receipt (no Amazon order) + line cards.
-8. **Recall** — `session_recall` shows cart confirmed + pantry counts.
+4. **Agent loop** — `kitchen_run` `{ days: 3, goal: "weekly" }` → steps + meal/product `mediaCard`s + cart.
+5. **Or manual:** `meal_plan` → `shop_list_build` → `product_search` → `cart_draft` → `cart_confirm`.
+6. **Recall** — `session_recall` shows cart + pantry counts (SQLite-durable across restart).
 
 ## SDK notes
 

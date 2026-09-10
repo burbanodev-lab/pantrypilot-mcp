@@ -28,13 +28,20 @@ These land after the baseline tag. If merged **before** 2026-10-15 UTC, also dec
 | Tool `kitchen_run` | One-call agent loop: pantry → meal_plan → shop_list → product_search → cart_draft + step log |
 | Docs / deploy tweaks | PREEXISTING.md, FRICTION_LOG entries, compose volume for SQLite |
 
-## Planned during Oct 15–20 window (not claimed done here)
+## Prep landed after baseline (declare if merged pre-window)
+
+| Item | Purpose |
+|------|---------|
+| Web companion (`apps/companion` + `/companion/`) | Demo + Product/UX: `kitchen_run` + media cards |
+| `evals/` + `npm run eval` | Happy-path pantry→meal→cart + soft-fail `cart_confirm` |
+| `FAILURE_MODES.md` | Judge-oriented failure documentation (bonus) |
+
+## Still planned during Oct 15–20 window
 
 1. ≥2 real external data sources (e.g. Open Food Facts + receipt/CSV ingest)
 2. MCP resources + prompts (`pantry://…`, `use_up_expiring`)
-3. Web companion UI (thin MCP client)
-4. `evals/` golden traces + `FAILURE_MODES.md` filled with real failures
-5. Hardened public HTTPS judge path / one-command compose demo fixtures
+3. Hard allergen / budget gates + Impact metrics polish
+4. Hardened public HTTPS judge path / demo fixtures
 
 ## Positioning
 

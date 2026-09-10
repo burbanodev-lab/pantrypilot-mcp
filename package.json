@@ -1,7 +1,7 @@
 {
   "name": "pantrypilot-mcp",
   "version": "0.1.0",
-  "description": "PantryPilot MCP server for Amazon Developer Hackathon Alexa+ track — household pantry, meal planning, and mock shopping cart tools over Streamable HTTP.",
+  "description": "PantryPilot MCP kitchen agent — Streamable HTTP tools, kitchen_run loop, SQLite memory, web companion, and evals (Amazon Alexa+ / GenAI Open Agent).",
   "type": "module",
   "engines": { "node": ">=20" },
   "main": "dist/server.js",
@@ -11,7 +11,8 @@
     "smoke": "tsx scripts/mcp-smoke.ts",
     "judge-check": "tsx scripts/judge-check.ts",
     "demo": "tsx scripts/demo-flow.ts",
-    "dev": "tsx src/server.ts"
+    "dev": "tsx src/server.ts",
+    "eval": "tsx evals/run.ts"
   },
   "keywords": ["mcp", "model-context-protocol", "alexa", "pantry", "hackathon"],
   "author": "Samuel Burbano",

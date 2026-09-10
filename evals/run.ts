@@ -1,0 +1,154 @@
+/**
+ * Scripted evals for GenAI bonus: pantry→meal→cart happy path + one failure case.
+ * Spawns an ephemeral MCP server (same pattern as smoke). No secrets.
+ */
+import { mkdtempSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
+import { startServer } from '../src/server.js';
+
+type CaseResult = { name: string; ok: boolean; detail: string };
+
+function toolText(result: { content?: unknown; isError?: boolean }): string {
+  const parts = Array.isArray(result.content) ? result.content : [];
+  return parts
+    .map((c) => (typeof c === 'object' && c && 'text' in c ? String((c as { text?: string }).text ?? '') : ''))
+    .join('');
+}
+
+function parseJson(result: { content?: unknown; isError?: boolean }): Record<string, unknown> {
+  if (result.isError) throw new Error(`tool isError: ${toolText(result)}`);
+  const text = toolText(result);
+  return JSON.parse(text) as Record<string, unknown>;
+}
+
+async function main() {
+  const dir = mkdtempSync(join(tmpdir(), 'pantrypilot-eval-'));
+  process.env.DATABASE_PATH = join(dir, 'eval.sqlite');
+
+  const { port, host } = await startServer(0, '127.0.0.1');
+  const url = `http://${host}:${port}/mcp`;
+  const client = new Client({ name: 'pantrypilot-eval', version: '0.1.0' });
+  const transport = new StreamableHTTPClientTransport(new URL(url));
+  const results: CaseResult[] = [];
+
+  try {
+    await client.connect(transport);
+
+    // --- Happy path: pantry → kitchen_run → cart + mediaCards ---
+    try {
+      const hid = 'eval-happy';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: {
+          householdId: hid,
+          diet: ['omnivore'],
+          allergies: ['peanuts'],
+          servings: 2,
+          budgetCents: 4500
+        }
+      });
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [
+            { name: 'eggs', quantity: 6, unit: 'count' },
+            { name: 'milk', quantity: 1, unit: 'L', expiresAt: '2026-10-16' },
+            { name: 'rice', quantity: 2, unit: 'cup' }
+          ]
+        }
+      });
+      const run = parseJson(
+        await client.callTool({
+          name: 'kitchen_run',
+          arguments: { householdId: hid, days: 2, goal: 'weekly', budgetCents: 4500 }
+        })
+      );
+      const steps = (run.steps as { tool: string; ok: boolean }[]) ?? [];
+      const expectedTools = [
+        'pantry_query',
+        'meal_plan',
+        'shop_list_build',
+        'product_search',
+        'cart_draft'
+      ];
+      const stepNames = steps.map((s) => s.tool);
+      const allStepsOk = steps.length > 0 && steps.every((s) => s.ok);
+      const hasChain = expectedTools.every((t) => stepNames.includes(t));
+      const cart = run.cart as { lines?: unknown[]; totalCents?: number } | null;
+      const cards = (run.mediaCards as unknown[]) ?? [];
+      const ok =
+        run.ok === true &&
+        allStepsOk &&
+        hasChain &&
+        !!cart &&
+        Array.isArray(cart.lines) &&
+        cart.lines.length > 0 &&
+        cards.length > 0;
+      results.push({
+        name: 'happy_path_pantry_meal_cart',
+        ok,
+        detail: ok
+          ? `steps=${steps.length} cartLines=${cart!.lines!.length} cards=${cards.length} totalMs=${run.totalMs}`
+          : `ok=${run.ok} stepsOk=${allStepsOk} chain=${hasChain} cart=${!!cart} cards=${cards.length}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'happy_path_pantry_meal_cart',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    // --- Failure case: cart_confirm without draft ---
+    try {
+      const hid = 'eval-fail-no-cart';
+      const conf = parseJson(
+        await client.callTool({
+          name: 'cart_confirm',
+          arguments: { householdId: hid }
+        })
+      );
+      const ok =
+        conf.ok === false &&
+        typeof conf.error === 'string' &&
+        /cart draft/i.test(conf.error);
+      results.push({
+        name: 'failure_cart_confirm_without_draft',
+        ok,
+        detail: ok
+          ? `expected soft-fail: ${conf.error}`
+          : `unexpected payload: ${JSON.stringify(conf).slice(0, 240)}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'failure_cart_confirm_without_draft',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    let failed = 0;
+    for (const r of results) {
+      const mark = r.ok ? 'PASS' : 'FAIL';
+      console.log(`${mark} ${r.name} — ${r.detail}`);
+      if (!r.ok) failed += 1;
+    }
+    if (failed) {
+      console.error(`EVAL FAILED (${failed}/${results.length})`);
+      process.exit(1);
+    }
+    console.log(`EVAL PASSED (${results.length}/${results.length})`);
+    process.exit(0);
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
+main().catch((err) => {
+  console.error('EVAL FAILED', err);
+  process.exit(1);
+});
