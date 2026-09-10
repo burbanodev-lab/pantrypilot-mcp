@@ -2,6 +2,7 @@
  * Mock product catalog with Alexa / shopping-card friendly fields.
  * No Amazon Product Advertising API — deterministic stub for the hackathon MVP.
  */
+import type { MediaCard } from './state.js';
 
 export type ProductCard = {
   asin: string;
@@ -193,4 +194,17 @@ export function searchCatalog(query: string, limit = 5): ProductCard[] {
 export function matchProductForIngredient(name: string): ProductCard | undefined {
   const hits = searchCatalog(name, 1);
   return hits[0];
+}
+
+/** Build a structured Alexa-friendly media / shopping card from a catalog product. */
+export function toProductMediaCard(p: ProductCard, quantity = 1): MediaCard {
+  const dollars = (p.priceCents / 100).toFixed(2);
+  const qtyLabel = quantity > 1 ? ` × ${quantity}` : '';
+  return {
+    title: p.title,
+    subtitle: `${p.brand} · $${dollars}${qtyLabel}${p.primeEligible ? ' · Prime' : ''}`,
+    text: `${p.category} · ★ ${p.rating} (${p.reviewCount} reviews)`,
+    imageUrl: p.imageUrl,
+    detailPageUrl: p.detailPageUrl
+  };
 }

@@ -21,11 +21,31 @@ export type HouseholdPrefs = {
   budgetCents?: number;
 };
 
+/** Alexa-friendly media / shopping card payload. */
+export type MediaCard = {
+  title: string;
+  subtitle?: string;
+  text?: string;
+  imageUrl?: string;
+  detailPageUrl?: string;
+};
+
+export type MealIngredient = {
+  name: string;
+  quantity: number;
+  unit: string;
+};
+
 export type MealSlot = {
   day: string;
   meal: 'breakfast' | 'lunch' | 'dinner' | 'snack';
   title: string;
-  ingredients: Array<{ name: string; quantity: number; unit: string }>;
+  description?: string;
+  tags?: string[];
+  estimatedMinutes?: number;
+  ingredients: MealIngredient[];
+  /** Structured card for Alexa+ companion UI. */
+  mediaCard?: MediaCard;
 };
 
 export type ShopLine = {
@@ -42,6 +62,8 @@ export type CartLine = {
   priceCents: number;
   imageUrl?: string;
   detailPageUrl?: string;
+  /** Structured shopping / media card for Alexa+ UI. */
+  mediaCard?: MediaCard;
 };
 
 export type CartDraft = {

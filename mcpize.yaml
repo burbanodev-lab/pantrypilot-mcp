@@ -1,0 +1,19 @@
+# mcpize.yaml — PantryPilot for MCPize marketplace
+version: 1
+name: pantrypilot
+description: |
+  Agentic kitchen MCP: stateful pantry → meal plan → shop list → draft cart.
+  Built for Alexa+ / MCP clients (protocol 2025-11-25 Streamable HTTP).
+
+runtime: typescript
+entry: src/server.ts
+
+build:
+  install: npm ci
+  command: npm run build
+
+startCommand:
+  type: http
+  command: node dist/server.js
+
+# Pricing configured in MCPize dashboard (free tier + paid)

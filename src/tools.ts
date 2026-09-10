@@ -1,7 +1,9 @@
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
-import { matchProductForIngredient, searchCatalog } from './catalog.js';
+import { matchProductForIngredient, searchCatalog, toProductMediaCard } from './catalog.js';
+import { generateMealPlanWithBedrock, isBedrockConfigured } from './bedrock.js';
+import { buildMealPlanStub } from './meals.js';
 import {
   bindSession,
   getOrCreateHousehold,
@@ -25,82 +27,6 @@ const householdIdField = z
   .optional()
   .describe('Household key. Defaults to session-bound household or "default".');
 
-/** Deterministic meal-plan stub from prefs + pantry presence. */
-function buildMealPlan(days: number, servings: number, diet: string[]): MealSlot[] {
-  const vegetarian = diet.some(d => /veg/i.test(d));
-  const templates: Array<Omit<MealSlot, 'day'>> = vegetarian
-    ? [
-        {
-          meal: 'breakfast',
-          title: 'Oatmeal with banana',
-          ingredients: [
-            { name: 'oats', quantity: 0.5 * servings, unit: 'cup' },
-            { name: 'banana', quantity: 1 * servings, unit: 'count' },
-            { name: 'milk', quantity: 1 * servings, unit: 'cup' }
-          ]
-        },
-        {
-          meal: 'lunch',
-          title: 'Tomato pasta',
-          ingredients: [
-            { name: 'pasta', quantity: 4 * servings, unit: 'oz' },
-            { name: 'tomatoes', quantity: 1 * servings, unit: 'can' },
-            { name: 'olive oil', quantity: 1 * servings, unit: 'tbsp' }
-          ]
-        },
-        {
-          meal: 'dinner',
-          title: 'Rice bowl with yogurt',
-          ingredients: [
-            { name: 'rice', quantity: 1 * servings, unit: 'cup' },
-            { name: 'yogurt', quantity: 0.5 * servings, unit: 'cup' },
-            { name: 'olive oil', quantity: 1 * servings, unit: 'tbsp' }
-          ]
-        }
-      ]
-    : [
-        {
-          meal: 'breakfast',
-          title: 'Eggs and toast oats side',
-          ingredients: [
-            { name: 'eggs', quantity: 2 * servings, unit: 'count' },
-            { name: 'oats', quantity: 0.25 * servings, unit: 'cup' },
-            { name: 'milk', quantity: 0.5 * servings, unit: 'cup' }
-          ]
-        },
-        {
-          meal: 'lunch',
-          title: 'Chicken rice bowl',
-          ingredients: [
-            { name: 'chicken', quantity: 0.4 * servings, unit: 'lb' },
-            { name: 'rice', quantity: 1 * servings, unit: 'cup' },
-            { name: 'olive oil', quantity: 1 * servings, unit: 'tbsp' }
-          ]
-        },
-        {
-          meal: 'dinner',
-          title: 'Spaghetti with chicken',
-          ingredients: [
-            { name: 'pasta', quantity: 4 * servings, unit: 'oz' },
-            { name: 'tomatoes', quantity: 1 * servings, unit: 'can' },
-            { name: 'chicken', quantity: 0.3 * servings, unit: 'lb' }
-          ]
-        }
-      ];
-
-  const out: MealSlot[] = [];
-  const start = new Date();
-  for (let i = 0; i < days; i++) {
-    const d = new Date(start);
-    d.setUTCDate(start.getUTCDate() + i);
-    const day = d.toISOString().slice(0, 10);
-    for (const t of templates) {
-      out.push({ day, ...t });
-    }
-  }
-  return out;
-}
-
 function buildShopList(h: ReturnType<typeof getOrCreateHousehold>): ShopLine[] {
   const needed = new Map<string, ShopLine>();
   for (const slot of h.mealPlan) {
@@ -123,6 +49,36 @@ function buildShopList(h: ReturnType<typeof getOrCreateHousehold>): ShopLine[] {
     }
   }
   return [...needed.values()].sort((a, b) => a.name.localeCompare(b.name));
+}
+
+async function resolveMealPlan(
+  days: number,
+  h: ReturnType<typeof getOrCreateHousehold>
+): Promise<{ plan: MealSlot[]; source: 'bedrock' | 'stub'; bedrockError?: string }> {
+  const servings = h.prefs.servings ?? 2;
+  const diet = h.prefs.diet ?? [];
+
+  if (!isBedrockConfigured()) {
+    return { plan: buildMealPlanStub(days, servings, diet), source: 'stub' };
+  }
+
+  try {
+    const plan = await generateMealPlanWithBedrock({
+      days,
+      servings,
+      prefs: h.prefs,
+      pantry: serializePantry(h)
+    });
+    return { plan, source: 'bedrock' };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    console.warn('[pantrypilot] Bedrock meal_plan failed; using stub:', message);
+    return {
+      plan: buildMealPlanStub(days, servings, diet),
+      source: 'stub',
+      bedrockError: message
+    };
+  }
 }
 
 export function registerTools(server: McpServer): void {
@@ -240,7 +196,7 @@ export function registerTools(server: McpServer): void {
     'meal_plan',
     {
       description:
-        'Generate a deterministic multi-day meal plan stub from prefs (no LLM). Respects vegetarian diet tags.',
+        'Generate a multi-day meal plan. Uses Amazon Bedrock Converse when AWS_REGION and BEDROCK_MODEL_ID are set (plus standard AWS credentials); otherwise a deterministic stub. Each slot includes description, tags, estimatedMinutes, and mediaCard.',
       inputSchema: {
         householdId: householdIdField,
         days: z.number().int().min(1).max(14).optional().describe('Number of days (default 3)')
@@ -250,10 +206,19 @@ export function registerTools(server: McpServer): void {
       const hid = resolveHouseholdId(householdId, extra.sessionId);
       const h = getOrCreateHousehold(hid);
       bindSession(extra.sessionId, hid);
-      const plan = buildMealPlan(days ?? 3, h.prefs.servings ?? 2, h.prefs.diet ?? []);
+      const n = days ?? 3;
+      const { plan, source, bedrockError } = await resolveMealPlan(n, h);
       h.mealPlan = plan;
       touch(h);
-      return jsonContent({ householdId: hid, days: days ?? 3, mealPlan: plan });
+      return jsonContent({
+        householdId: hid,
+        days: n,
+        source,
+        bedrockConfigured: isBedrockConfigured(),
+        ...(bedrockError ? { bedrockError } : {}),
+        mealPlan: plan,
+        mediaCards: plan.map(s => s.mediaCard).filter(Boolean)
+      });
     }
   );
 
@@ -268,7 +233,7 @@ export function registerTools(server: McpServer): void {
       const h = getOrCreateHousehold(hid);
       bindSession(extra.sessionId, hid);
       if (h.mealPlan.length === 0) {
-        h.mealPlan = buildMealPlan(3, h.prefs.servings ?? 2, h.prefs.diet ?? []);
+        h.mealPlan = buildMealPlanStub(3, h.prefs.servings ?? 2, h.prefs.diet ?? []);
       }
       h.shopList = buildShopList(h);
       touch(h);
@@ -280,7 +245,7 @@ export function registerTools(server: McpServer): void {
     'product_search',
     {
       description:
-        'Search the mock product catalog. Returns card fields (asin, title, price, image, detail URL) suitable for Alexa shopping cards.',
+        'Search the mock product catalog. Returns card fields (asin, title, price, image, detail URL) plus structured mediaCard payloads suitable for Alexa shopping cards.',
       inputSchema: {
         query: z.string().describe('Search query'),
         limit: z.number().int().min(1).max(20).optional()
@@ -302,8 +267,10 @@ export function registerTools(server: McpServer): void {
           detailPageUrl: p.detailPageUrl,
           rating: p.rating,
           reviewCount: p.reviewCount,
-          primeEligible: p.primeEligible
-        }))
+          primeEligible: p.primeEligible,
+          mediaCard: toProductMediaCard(p)
+        })),
+        mediaCards: products.map(toProductMediaCard)
       });
     }
   );
@@ -312,7 +279,7 @@ export function registerTools(server: McpServer): void {
     'cart_draft',
     {
       description:
-        'Draft a mock cart from the current shopping list (or explicit lines). No Amazon API — local stub only.',
+        'Draft a mock cart from the current shopping list (or explicit lines). No Amazon API — local stub only. Lines include mediaCard fields for Alexa+ UI.',
       inputSchema: {
         householdId: householdIdField,
         lines: z
@@ -338,13 +305,15 @@ export function registerTools(server: McpServer): void {
       for (const line of source) {
         const product = matchProductForIngredient(line.name);
         if (!product) continue;
+        const mediaCard = toProductMediaCard(product, line.quantity);
         cartLines.push({
           asin: product.asin,
           title: product.title,
           quantity: line.quantity,
           priceCents: product.priceCents,
           imageUrl: product.imageUrl,
-          detailPageUrl: product.detailPageUrl
+          detailPageUrl: product.detailPageUrl,
+          mediaCard
         });
       }
       const totalCents = cartLines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
@@ -357,7 +326,11 @@ export function registerTools(server: McpServer): void {
         createdAt: new Date().toISOString()
       };
       touch(h);
-      return jsonContent({ householdId: hid, cart: h.cart });
+      return jsonContent({
+        householdId: hid,
+        cart: h.cart,
+        mediaCards: cartLines.map(l => l.mediaCard)
+      });
     }
   );
 
@@ -404,7 +377,8 @@ export function registerTools(server: McpServer): void {
           lineCount: h.cart.lines.length,
           confirmedAt: h.cart.confirmedAt,
           note: 'Mock confirmation — no AWS / Amazon order placed.'
-        }
+        },
+        mediaCards: h.cart.lines.map(l => l.mediaCard).filter(Boolean)
       });
     }
   );

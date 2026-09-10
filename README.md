@@ -4,7 +4,7 @@ Greenfield **TypeScript** [Model Context Protocol](https://modelcontextprotocol.
 
 PantryPilot exposes household pantry, preferences, meal planning, shopping list, product search (mock catalog with card fields), and cart draft/confirm tools over **Streamable HTTP**. Protocol version negotiated on `initialize`: **`2025-11-25`**.
 
-No AWS keys are required for this MVP.
+AWS credentials are **optional**. Without `AWS_REGION` + `BEDROCK_MODEL_ID`, `meal_plan` uses a deterministic stub so local demos and Docker still work offline.
 
 ## Architecture
 
@@ -18,21 +18,25 @@ Alexa+ / MCP client
 │  McpServer + tools            │
 └───────────────┬───────────────┘
                 │
-                ▼
-     In-memory household store
-     (keyed by householdId;
-      MCP sessionId → household bind)
-                │
-                ▼
-     Mock product catalog (ASIN cards)
+        ┌───────┴────────┐
+        ▼                ▼
+ In-memory household   Optional Amazon Bedrock
+ store (householdId;   (Converse via
+  sessionId bind)      @aws-sdk/client-bedrock-runtime)
+        │                │
+        ▼                ▼
+ Mock product catalog   Structured meal slots
+ (ASIN + mediaCard)     + mediaCard payloads
 ```
 
 | Layer | Role |
 |-------|------|
 | `src/server.ts` | Entry: Streamable HTTP, session map, `/mcp` + `/health` |
 | `src/tools.ts` | Ten MCP tools |
-| `src/state.ts` | Household pantry / prefs / plan / cart |
-| `src/catalog.ts` | Deterministic mock catalog + search |
+| `src/state.ts` | Household pantry / prefs / plan / cart + `MediaCard` types |
+| `src/meals.ts` | Deterministic meal-plan stub + slot enrichment |
+| `src/bedrock.ts` | Optional Bedrock Converse meal_plan path |
+| `src/catalog.ts` | Deterministic mock catalog + `mediaCard` helpers |
 | `scripts/mcp-smoke.ts` | Asserts protocol `2025-11-25` + non-empty `tools/list` |
 
 ### Tools
@@ -42,11 +46,24 @@ Alexa+ / MCP client
 | `pantry_upsert` | Add/update pantry items |
 | `pantry_query` | List/filter pantry |
 | `prefs_set` / `prefs_get` | Dietary preferences |
-| `meal_plan` | Deterministic multi-day plan stub |
+| `meal_plan` | Bedrock (if configured) or deterministic multi-day plan; structured slots + `mediaCard` |
 | `shop_list_build` | Shortfalls vs pantry |
-| `product_search` | Mock catalog cards (asin, image, price, URL) |
-| `cart_draft` / `cart_confirm` | Mock cart (no Amazon order) |
+| `product_search` | Mock catalog cards (asin, image, price, URL) + `mediaCard` |
+| `cart_draft` / `cart_confirm` | Mock cart (no Amazon order); lines carry `mediaCard` |
 | `session_recall` | Session/household context snapshot |
+
+### Structured meal + media cards
+
+Meal slots include `description`, `tags`, `estimatedMinutes`, `ingredients`, and an Alexa-oriented `mediaCard` (`title`, `subtitle`, `text`, `imageUrl`, `detailPageUrl`). Product search and cart lines expose the same `mediaCard` shape so companion UIs can render consistently.
+
+### Bedrock meal_plan (optional)
+
+When **both** are set:
+
+- `AWS_REGION`
+- `BEDROCK_MODEL_ID`
+
+…plus standard AWS credentials (`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` / `AWS_SESSION_TOKEN`, shared config, or IAM role), `meal_plan` calls Bedrock **Converse** and expects a JSON array of meal objects. On missing config or invoke/parse failure, the server falls back to the stub and reports `source: "stub"` (and `bedrockError` when applicable).
 
 ## Requirements
 
@@ -57,7 +74,7 @@ Alexa+ / MCP client
 
 ```bash
 cd pantrypilot-mcp
-cp .env.example .env   # optional
+cp .env.example .env   # optional; add Bedrock vars only if you have access
 npm install
 npm run build
 ```
@@ -75,12 +92,24 @@ Environment (see `.env.example`):
 - `PORT` (default `3000`)
 - `HOST` (default `127.0.0.1`; use `0.0.0.0` in Docker)
 - `ALLOWED_HOSTS` — comma-separated Host allow-list when not on plain localhost
+- `AWS_REGION` + `BEDROCK_MODEL_ID` — enable Bedrock meal plans
+- Standard AWS credential env vars (never commit real values)
 
 ### Docker
 
 ```bash
+# Stub path (default — no AWS needed)
+docker compose up --build
+
+# Optional Bedrock (credentials from your shell / secret store)
+export AWS_REGION=us-east-1
+export BEDROCK_MODEL_ID=amazon.nova-lite-v1:0
+# export AWS_ACCESS_KEY_ID=...
+# export AWS_SECRET_ACCESS_KEY=...
 docker compose up --build
 ```
+
+Compose forwards `AWS_*` / `BEDROCK_MODEL_ID` from the host environment; the image itself does not bake secrets.
 
 ## Smoke test
 
@@ -98,22 +127,23 @@ Expected output includes:
 
 Against an already-running server you can also point a custom client at `http://127.0.0.1:3000/mcp` using `@modelcontextprotocol/sdk` `Client` + `StreamableHTTPClientTransport`.
 
-## Demo outline (Alexa+)
+## Demo script (Alexa+)
 
 1. **Warm start** — `session_recall` with `householdId: "demo"`.
 2. **Stock the pantry** — `pantry_upsert` eggs, milk, rice.
 3. **Prefs** — `prefs_set` `{ diet: ["omnivore"], servings: 2 }`.
-4. **Plan** — `meal_plan` `{ days: 3 }` → deterministic breakfast/lunch/dinner.
+4. **Plan** — `meal_plan` `{ days: 3 }` → breakfast/lunch/dinner with `mediaCard`s (`source` is `stub` or `bedrock`).
 5. **Shop** — `shop_list_build` → gaps not covered by pantry.
-6. **Discover** — `product_search` `{ query: "chicken" }` → Alexa-ready cards.
-7. **Cart** — `cart_draft` then `cart_confirm` → mock receipt (no AWS).
+6. **Discover** — `product_search` `{ query: "chicken" }` → Alexa-ready `mediaCard`s.
+7. **Cart** — `cart_draft` then `cart_confirm` → mock receipt (no Amazon order) + line cards.
 8. **Recall** — `session_recall` shows cart confirmed + pantry counts.
 
 ## SDK notes
 
 - Package: `@modelcontextprotocol/sdk` **v1.30.x** (monolith). Its `LATEST_PROTOCOL_VERSION` is `2025-11-25`.
 - Transport: `StreamableHTTPServerTransport` with `enableJsonResponse: true` and session IDs.
-- See `FRICTION_LOG.md` for scaffold friction vs the newer v2 / `2026-07-28` packages.
+- Optional LLM: `@aws-sdk/client-bedrock-runtime` (Converse).
+- See `FRICTION_LOG.md` for scaffold friction vs the newer v2 / `2026-07-28` packages and Bedrock notes.
 
 ## License
 

@@ -25,7 +25,7 @@ export function createPantryPilotServer(): McpServer {
     },
     {
       instructions:
-        'PantryPilot helps Alexa+ manage household pantry inventory, preferences, meal plans, shopping lists, and mock Amazon cart drafts. Pass householdId on tools when multi-home; otherwise session binding is used. No AWS credentials required for this MVP.'
+        'PantryPilot helps Alexa+ manage household pantry inventory, preferences, meal plans, shopping lists, and mock Amazon cart drafts. Pass householdId on tools when multi-home; otherwise session binding is used. meal_plan uses Amazon Bedrock when AWS_REGION and BEDROCK_MODEL_ID are set (standard AWS creds); otherwise a deterministic stub. Product and meal responses include structured mediaCard payloads.'
     }
   );
   registerTools(server);
