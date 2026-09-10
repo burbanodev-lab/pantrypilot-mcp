@@ -12,7 +12,10 @@ import {
   resolveHouseholdId,
   serializePantry,
   touch,
+  type CartLine,
+  type HouseholdState,
   type MealSlot,
+  type MediaCard,
   type ShopLine
 } from './state.js';
 
@@ -27,7 +30,7 @@ const householdIdField = z
   .optional()
   .describe('Household key. Defaults to session-bound household or "default".');
 
-function buildShopList(h: ReturnType<typeof getOrCreateHousehold>): ShopLine[] {
+function buildShopList(h: HouseholdState): ShopLine[] {
   const needed = new Map<string, ShopLine>();
   for (const slot of h.mealPlan) {
     for (const ing of slot.ingredients) {
@@ -53,7 +56,7 @@ function buildShopList(h: ReturnType<typeof getOrCreateHousehold>): ShopLine[] {
 
 async function resolveMealPlan(
   days: number,
-  h: ReturnType<typeof getOrCreateHousehold>
+  h: HouseholdState
 ): Promise<{ plan: MealSlot[]; source: 'bedrock' | 'stub'; bedrockError?: string }> {
   const servings = h.prefs.servings ?? 2;
   const diet = h.prefs.diet ?? [];
@@ -81,11 +84,56 @@ async function resolveMealPlan(
   }
 }
 
+function draftCartFromShopList(h: HouseholdState): {
+  cart: NonNullable<HouseholdState['cart']>;
+  mediaCards: MediaCard[];
+} {
+  const source = h.shopList.map(s => ({
+    name: s.name,
+    quantity: Math.max(1, Math.ceil(s.quantity))
+  }));
+
+  const cartLines: CartLine[] = [];
+  for (const line of source) {
+    const product = matchProductForIngredient(line.name);
+    if (!product) continue;
+    const mediaCard = toProductMediaCard(product, line.quantity);
+    cartLines.push({
+      asin: product.asin,
+      title: product.title,
+      quantity: line.quantity,
+      priceCents: product.priceCents,
+      imageUrl: product.imageUrl,
+      detailPageUrl: product.detailPageUrl,
+      mediaCard
+    });
+  }
+  const totalCents = cartLines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+  const cart = {
+    cartId: `cart_${randomUUID().slice(0, 8)}`,
+    status: 'draft' as const,
+    lines: cartLines,
+    totalCents,
+    currency: 'USD' as const,
+    createdAt: new Date().toISOString()
+  };
+  return { cart, mediaCards: cartLines.map(l => l.mediaCard!).filter(Boolean) };
+}
+
+type KitchenStep = {
+  tool: string;
+  ok: boolean;
+  ms: number;
+  detail?: string;
+  error?: string;
+};
+
 export function registerTools(server: McpServer): void {
   server.registerTool(
     'pantry_upsert',
     {
-      description: 'Add or update pantry items for a household (in-memory).',
+      description:
+        'Add or update pantry items for a household (persisted to SQLite when DATABASE_PATH is available).',
       inputSchema: {
         householdId: householdIdField,
         items: z
@@ -297,40 +345,44 @@ export function registerTools(server: McpServer): void {
       const hid = resolveHouseholdId(householdId, extra.sessionId);
       const h = getOrCreateHousehold(hid);
       bindSession(extra.sessionId, hid);
-      const source =
-        lines?.map(l => ({ name: l.name, quantity: l.quantity ?? 1 })) ??
-        h.shopList.map(s => ({ name: s.name, quantity: Math.max(1, Math.ceil(s.quantity)) }));
-
-      const cartLines = [];
-      for (const line of source) {
-        const product = matchProductForIngredient(line.name);
-        if (!product) continue;
-        const mediaCard = toProductMediaCard(product, line.quantity);
-        cartLines.push({
-          asin: product.asin,
-          title: product.title,
-          quantity: line.quantity,
-          priceCents: product.priceCents,
-          imageUrl: product.imageUrl,
-          detailPageUrl: product.detailPageUrl,
-          mediaCard
+      if (lines?.length) {
+        const cartLines: CartLine[] = [];
+        for (const line of lines) {
+          const qty = line.quantity ?? 1;
+          const product = matchProductForIngredient(line.name);
+          if (!product) continue;
+          const mediaCard = toProductMediaCard(product, qty);
+          cartLines.push({
+            asin: product.asin,
+            title: product.title,
+            quantity: qty,
+            priceCents: product.priceCents,
+            imageUrl: product.imageUrl,
+            detailPageUrl: product.detailPageUrl,
+            mediaCard
+          });
+        }
+        const totalCents = cartLines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+        h.cart = {
+          cartId: `cart_${randomUUID().slice(0, 8)}`,
+          status: 'draft',
+          lines: cartLines,
+          totalCents,
+          currency: 'USD',
+          createdAt: new Date().toISOString()
+        };
+        touch(h);
+        return jsonContent({
+          householdId: hid,
+          cart: h.cart,
+          mediaCards: cartLines.map(l => l.mediaCard)
         });
       }
-      const totalCents = cartLines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
-      h.cart = {
-        cartId: `cart_${randomUUID().slice(0, 8)}`,
-        status: 'draft',
-        lines: cartLines,
-        totalCents,
-        currency: 'USD',
-        createdAt: new Date().toISOString()
-      };
+
+      const { cart, mediaCards } = draftCartFromShopList(h);
+      h.cart = cart;
       touch(h);
-      return jsonContent({
-        householdId: hid,
-        cart: h.cart,
-        mediaCards: cartLines.map(l => l.mediaCard)
-      });
+      return jsonContent({ householdId: hid, cart: h.cart, mediaCards });
     }
   );
 
@@ -387,7 +439,7 @@ export function registerTools(server: McpServer): void {
     'session_recall',
     {
       description:
-        'Recall session/household context: prefs summary, pantry count, meal plan days, cart status.',
+        'Recall session/household context: prefs summary, pantry count, meal plan days, cart status. Survives process restart when SQLite is enabled.',
       inputSchema: {
         householdId: householdIdField
       }
@@ -395,6 +447,219 @@ export function registerTools(server: McpServer): void {
     async ({ householdId }, extra) => {
       const snapshot = recallSession(extra.sessionId, householdId);
       return jsonContent(snapshot);
+    }
+  );
+
+  server.registerTool(
+    'kitchen_run',
+    {
+      description:
+        'Agent loop: orchestrate pantry_query → meal_plan → shop_list_build → product_search (top shortfalls) → cart_draft in one call. Returns step log with timings plus final cart and mediaCards. Prefer this for weekly kitchen demos.',
+      inputSchema: {
+        householdId: householdIdField,
+        days: z
+          .number()
+          .int()
+          .min(1)
+          .max(14)
+          .optional()
+          .describe('Meal plan days (default 3)'),
+        budgetCents: z
+          .number()
+          .int()
+          .nonnegative()
+          .optional()
+          .describe('Optional budget hint stored on prefs'),
+        goal: z
+          .enum(['weekly', 'use_expiring'])
+          .optional()
+          .describe('Planning goal (default weekly)')
+      }
+    },
+    async ({ householdId, days, budgetCents, goal }, extra) => {
+      const started = Date.now();
+      const steps: KitchenStep[] = [];
+      const hid = resolveHouseholdId(householdId, extra.sessionId);
+      const h = getOrCreateHousehold(hid);
+      bindSession(extra.sessionId, hid);
+
+      if (budgetCents !== undefined) {
+        h.prefs = { ...h.prefs, budgetCents };
+        touch(h);
+      }
+
+      const n = days ?? 3;
+      const runGoal = goal ?? 'weekly';
+
+      // 1) pantry_query
+      {
+        const t0 = Date.now();
+        try {
+          const pantry = serializePantry(h);
+          steps.push({
+            tool: 'pantry_query',
+            ok: true,
+            ms: Date.now() - t0,
+            detail: `count=${pantry.length}`
+          });
+        } catch (err) {
+          steps.push({
+            tool: 'pantry_query',
+            ok: false,
+            ms: Date.now() - t0,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+
+      // 2) meal_plan
+      let mealSource: 'bedrock' | 'stub' = 'stub';
+      let bedrockError: string | undefined;
+      {
+        const t0 = Date.now();
+        try {
+          const resolved = await resolveMealPlan(n, h);
+          mealSource = resolved.source;
+          bedrockError = resolved.bedrockError;
+          // use_expiring: sort slots that mention soon-expiring pantry names first (light heuristic)
+          let plan = resolved.plan;
+          if (runGoal === 'use_expiring') {
+            const expiring = serializePantry(h)
+              .filter(p => p.expiresAt)
+              .sort((a, b) => String(a.expiresAt).localeCompare(String(b.expiresAt)))
+              .slice(0, 5)
+              .map(p => p.name.toLowerCase());
+            if (expiring.length) {
+              plan = [...plan].sort((a, b) => {
+                const score = (s: MealSlot) =>
+                  s.ingredients.some(i => expiring.some(e => i.name.toLowerCase().includes(e)))
+                    ? 0
+                    : 1;
+                return score(a) - score(b);
+              });
+            }
+          }
+          h.mealPlan = plan;
+          touch(h);
+          steps.push({
+            tool: 'meal_plan',
+            ok: true,
+            ms: Date.now() - t0,
+            detail: `days=${n} source=${mealSource} slots=${plan.length} goal=${runGoal}`
+          });
+        } catch (err) {
+          steps.push({
+            tool: 'meal_plan',
+            ok: false,
+            ms: Date.now() - t0,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+
+      // 3) shop_list_build
+      {
+        const t0 = Date.now();
+        try {
+          if (h.mealPlan.length === 0) {
+            h.mealPlan = buildMealPlanStub(n, h.prefs.servings ?? 2, h.prefs.diet ?? []);
+          }
+          h.shopList = buildShopList(h);
+          touch(h);
+          steps.push({
+            tool: 'shop_list_build',
+            ok: true,
+            ms: Date.now() - t0,
+            detail: `lines=${h.shopList.length}`
+          });
+        } catch (err) {
+          steps.push({
+            tool: 'shop_list_build',
+            ok: false,
+            ms: Date.now() - t0,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+
+      // 4) product_search for top shortfalls
+      const productHits: { query: string; count: number }[] = [];
+      {
+        const t0 = Date.now();
+        try {
+          const queries = h.shopList.slice(0, 5).map(s => s.name);
+          for (const q of queries) {
+            const products = searchCatalog(q, 3);
+            productHits.push({ query: q, count: products.length });
+          }
+          steps.push({
+            tool: 'product_search',
+            ok: true,
+            ms: Date.now() - t0,
+            detail: `queries=${queries.length} hits=${productHits.reduce((a, b) => a + b.count, 0)}`
+          });
+        } catch (err) {
+          steps.push({
+            tool: 'product_search',
+            ok: false,
+            ms: Date.now() - t0,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+
+      // 5) cart_draft
+      let mediaCards: MediaCard[] = [];
+      {
+        const t0 = Date.now();
+        try {
+          const drafted = draftCartFromShopList(h);
+          h.cart = drafted.cart;
+          mediaCards = drafted.mediaCards;
+          touch(h);
+          steps.push({
+            tool: 'cart_draft',
+            ok: true,
+            ms: Date.now() - t0,
+            detail: `cartId=${h.cart.cartId} lines=${h.cart.lines.length} totalCents=${h.cart.totalCents}`
+          });
+        } catch (err) {
+          steps.push({
+            tool: 'cart_draft',
+            ok: false,
+            ms: Date.now() - t0,
+            error: err instanceof Error ? err.message : String(err)
+          });
+        }
+      }
+
+      const ok = steps.every(s => s.ok);
+      h.notes.push(
+        `kitchen_run ${runGoal} ${ok ? 'ok' : 'partial'} at ${new Date().toISOString()} (${Date.now() - started}ms)`
+      );
+      touch(h);
+
+      return jsonContent({
+        ok,
+        householdId: hid,
+        goal: runGoal,
+        days: n,
+        mealPlanSource: mealSource,
+        bedrockConfigured: isBedrockConfigured(),
+        ...(bedrockError ? { bedrockError } : {}),
+        steps,
+        totalMs: Date.now() - started,
+        pantryCount: h.pantry.size,
+        mealPlan: h.mealPlan,
+        shopList: h.shopList,
+        productHits,
+        cart: h.cart ?? null,
+        mediaCards: [
+          ...h.mealPlan.map(s => s.mediaCard).filter(Boolean),
+          ...mediaCards
+        ],
+        prefs: h.prefs
+      });
     }
   );
 }

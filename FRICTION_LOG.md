@@ -29,3 +29,17 @@
 - Docker Compose forwards optional `AWS_*` / `BEDROCK_MODEL_ID` from the host; secrets stay out of the image and git (`.env` gitignored; `.env.example` placeholders only).
 
 **Still rough:** No live Bedrock integration test in `npm run smoke` (would need real credentials and a provisioned model). Structured output / tool-use on Converse would harden JSON reliability further; deferred to keep the MVP path simple.
+
+## 2026-09-10 — GenAI prep: SQLite via sql.js + kitchen_run (no native toolchain)
+
+**Context:** GenAI Open Agent 2026 prep on `/workspace/pantrypilot-mcp` (`burbanodev-lab`). Plan required durable SQLite + `kitchen_run` agent loop before the Oct 15 window, tagged at `baseline/pre-genai-2026-10-14`.
+
+**What happened:**
+- `better-sqlite3@13` requires Node ≥22 and a local `node-gyp`/`make` toolchain. This box is Node **20.19.2** without `make`/g++ and without root for `apt-get`. Install failed at `node-gyp rebuild`.
+- Plan explicitly allows **sql.js** as the SQLite alternative. `sql.js` WASM loads with `locateFile` via `createRequire` → `sql.js/dist`, persists with `db.export()` + atomic rename to `DATABASE_PATH` (default `./data/pantrypilot.sqlite`).
+- Circular type imports (`db.ts` ↔ `state.ts`) stay safe because DB uses `import type` only from state; runtime init is `await initDatabase()` inside `startServer` before listen.
+- Smoke must set an isolated temp `DATABASE_PATH` so parallel agents sharing the box do not clobber `./data/pantrypilot.sqlite`.
+
+**Workaround / decision:** Ship `sql.js` + `@types/sql.js`; keep API surface identical to a native SQLite store (tables: households, pantry_items, session_map). Debounced flush (50ms) + `persistDatabaseNow` on SIGINT/SIGTERM. Document in PREEXISTING.md that baseline tag still had in-memory-only state; SQLite + `kitchen_run` are post-tag branch work.
+
+**Still rough:** sql.js is single-process and rewrite-the-file on persist — fine for solo Docker volume demos, not multi-replica. Restart-across-process proof is manual (kill PID / new process same `DATABASE_PATH`); smoke covers in-process tool path only. Native `better-sqlite3` can replace later if the runtime gains build tools or Node 22 + prebuilds.
