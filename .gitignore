@@ -8,3 +8,9 @@ coverage/
 .vscode/
 .idea/
 *.tsbuildinfo
+
+# Local SQLite (keep data/.gitkeep)
+data/*.sqlite
+data/*.sqlite-*
+data/*.tmp
+.mcpize/

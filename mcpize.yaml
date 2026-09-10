@@ -2,8 +2,9 @@
 version: 1
 name: pantrypilot
 description: |
-  Agentic kitchen MCP: stateful pantry → meal plan → shop list → draft cart.
-  Built for Alexa+ / MCP clients (protocol 2025-11-25 Streamable HTTP).
+  Agentic kitchen MCP: durable SQLite pantry → meal plan → shop list → draft cart.
+  Prefer kitchen_run for the full agent loop. Protocol 2025-11-25 Streamable HTTP.
+  Set DATABASE_PATH for the SQLite file (default ./data/pantrypilot.sqlite).
 
 runtime: typescript
 entry: src/server.ts

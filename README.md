@@ -6,6 +6,17 @@ PantryPilot exposes household pantry, preferences, meal planning, shopping list,
 
 AWS credentials are **optional**. Without `AWS_REGION` + `BEDROCK_MODEL_ID`, `meal_plan` uses a deterministic stub so local demos and Docker still work offline.
 
+
+
+## GenAI Open Agent 2026
+
+- **Track intent:** 05 Real-World Industry Agents (household kitchen ops); backup 04 Persistent Memory
+- **Baseline tag:** `baseline/pre-genai-2026-10-14` — see [`PREEXISTING.md`](./PREEXISTING.md)
+- **Scored branch:** `genai/open-agent-2026`
+- **Durable memory:** SQLite via `sql.js` at `DATABASE_PATH` (default `./data/pantrypilot.sqlite`)
+- **Agent entrypoint:** MCP tool `kitchen_run`
+- **One-command:** `docker compose up --build` (volume `pantrypilot-data` mounts `/data`)
+
 ## Architecture
 
 ```
@@ -20,9 +31,9 @@ Alexa+ / MCP client
                 │
         ┌───────┴────────┐
         ▼                ▼
- In-memory household   Optional Amazon Bedrock
- store (householdId;   (Converse via
-  sessionId bind)      @aws-sdk/client-bedrock-runtime)
+ SQLite household      Optional Amazon Bedrock
+ store (DATABASE_PATH; (Converse via
+  + memory cache)      @aws-sdk/client-bedrock-runtime)
         │                │
         ▼                ▼
  Mock product catalog   Structured meal slots
@@ -32,8 +43,8 @@ Alexa+ / MCP client
 | Layer | Role |
 |-------|------|
 | `src/server.ts` | Entry: Streamable HTTP, session map, `/mcp` + `/health` |
-| `src/tools.ts` | Ten MCP tools |
-| `src/state.ts` | Household pantry / prefs / plan / cart + `MediaCard` types |
+| `src/tools.ts` | Eleven MCP tools (incl. `kitchen_run`) |
+| `src/state.ts` / `src/db.ts` | Household pantry / prefs / plan / cart + SQLite durability + `MediaCard` types |
 | `src/meals.ts` | Deterministic meal-plan stub + slot enrichment |
 | `src/bedrock.ts` | Optional Bedrock Converse meal_plan path |
 | `src/catalog.ts` | Deterministic mock catalog + `mediaCard` helpers |
@@ -51,6 +62,7 @@ Alexa+ / MCP client
 | `product_search` | Mock catalog cards (asin, image, price, URL) + `mediaCard` |
 | `cart_draft` / `cart_confirm` | Mock cart (no Amazon order); lines carry `mediaCard` |
 | `session_recall` | Session/household context snapshot |
+| `kitchen_run` | Agent loop: pantry → meal_plan → shop → product_search → cart_draft + step log |
 
 ### Structured meal + media cards
 

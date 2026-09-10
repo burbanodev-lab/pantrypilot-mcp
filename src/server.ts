@@ -8,6 +8,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import { createMcpExpressApp } from '@modelcontextprotocol/sdk/server/express.js';
 import { isInitializeRequest } from '@modelcontextprotocol/sdk/types.js';
 import type { Request, Response } from 'express';
+import { initDatabase, persistDatabaseNow, resolveDatabasePath } from './db.js';
 import { registerTools } from './tools.js';
 
 const PORT = Number(process.env.PORT ?? 3000);
@@ -25,7 +26,7 @@ export function createPantryPilotServer(): McpServer {
     },
     {
       instructions:
-        'PantryPilot helps Alexa+ manage household pantry inventory, preferences, meal plans, shopping lists, and mock Amazon cart drafts. Pass householdId on tools when multi-home; otherwise session binding is used. meal_plan uses Amazon Bedrock when AWS_REGION and BEDROCK_MODEL_ID are set (standard AWS creds); otherwise a deterministic stub. Product and meal responses include structured mediaCard payloads.'
+        'PantryPilot helps manage household pantry inventory, preferences, meal plans, shopping lists, and mock cart drafts over MCP. Prefer kitchen_run for a full pantry→meal→shop→cart agent loop. State is durable in SQLite (DATABASE_PATH). Pass householdId on tools when multi-home; otherwise session binding is used. meal_plan uses Amazon Bedrock when AWS_REGION and BEDROCK_MODEL_ID are set; otherwise a deterministic stub. Product and meal responses include structured mediaCard payloads.'
     }
   );
   registerTools(server);
@@ -42,7 +43,12 @@ export function createApp() {
   });
 
   app.get('/health', (_req, res) => {
-    res.json({ ok: true, name: 'pantrypilot-mcp', protocol: '2025-11-25' });
+    res.json({
+      ok: true,
+      name: 'pantrypilot-mcp',
+      protocol: '2025-11-25',
+      databasePath: resolveDatabasePath()
+    });
   });
 
   const mcpHandler = async (req: Request, res: Response) => {
@@ -119,7 +125,11 @@ export function createApp() {
   return app;
 }
 
-export function startServer(port = PORT, host = HOST): Promise<{ port: number; host: string }> {
+export async function startServer(
+  port = PORT,
+  host = HOST
+): Promise<{ port: number; host: string }> {
+  await initDatabase();
   const app = createApp();
   return new Promise((resolve, reject) => {
     const httpServer = app.listen(port, host, (error?: Error) => {
@@ -128,13 +138,22 @@ export function startServer(port = PORT, host = HOST): Promise<{ port: number; h
         return;
       }
       const addr = httpServer.address();
-      const actualPort =
-        typeof addr === 'object' && addr ? addr.port : port;
+      const actualPort = typeof addr === 'object' && addr ? addr.port : port;
       console.log(
         `PantryPilot MCP Streamable HTTP listening on http://${host}:${actualPort}/mcp (protocol 2025-11-25)`
       );
       resolve({ port: actualPort, host });
     });
+
+    const shutdown = () => {
+      try {
+        persistDatabaseNow();
+      } catch {
+        /* ignore */
+      }
+    };
+    process.once('SIGINT', shutdown);
+    process.once('SIGTERM', shutdown);
   });
 }
 
