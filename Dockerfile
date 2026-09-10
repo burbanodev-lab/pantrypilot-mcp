@@ -17,6 +17,7 @@ ENV DATABASE_PATH=/data/pantrypilot.sqlite
 COPY --from=build /app/package.json /app/package-lock.json* ./
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
+COPY apps/companion ./apps/companion
 RUN mkdir -p /data && chown -R node:node /data /app
 EXPOSE 3000
 USER node
