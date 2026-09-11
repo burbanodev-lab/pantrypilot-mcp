@@ -11,10 +11,10 @@ Do not mark `SUBMITTED` until Devpost returns a project/submission confirmation 
 - Hackathon: https://amazonappdev2026.devpost.com/
 - Repository: https://github.com/burbanodev-lab/pantrypilot-mcp
 - YouTube channel: https://www.youtube.com/@burbanodev
-- Demo video: https://youtu.be/U24ZL9LqIsw
+- Demo video: https://www.youtube.com/watch?v=U24ZL9LqIsw
 - Live MCP health/demo reference: https://pantrypilot.mcpize.run
 
-Before pressing final Submit, visually confirm the YouTube demo is **Public**, **English**, and **under 3:00**. The automated crawler could not reliably read YouTube short-link metadata, so those three properties are not independently asserted here.
+Before pressing final Submit, visually confirm the YouTube demo is **Public**, **English**, and **under 3:00**. The automated crawler could not reliably read YouTube metadata for this video, so those three properties are not independently asserted here.
 
 ## Devpost project fields
 
@@ -41,7 +41,7 @@ https://github.com/burbanodev-lab/pantrypilot-mcp
 `burbanodev-lab`
 
 ### Demo video
-https://youtu.be/U24ZL9LqIsw
+https://www.youtube.com/watch?v=U24ZL9LqIsw
 
 ### Short description
 PantryPilot is a stateful Alexa+ kitchen operations agent delivered as a self-hosted MCP server. A household can stock its pantry, save dietary preferences, generate multi-day meal plans, calculate ingredient shortages, discover product options, draft a safe cart, and recall the resulting state later. It uses MCP `2025-11-25` over Streamable HTTP, durable SQLite-backed household state, structured media cards, safety gates for allergens and budget, and an optional Amazon Bedrock Converse path with a deterministic credential-free fallback for judging.
