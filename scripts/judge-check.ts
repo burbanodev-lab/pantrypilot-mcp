@@ -1,4 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs';
+import type { Server } from 'node:http';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startServer } from '../src/server.js';
@@ -11,6 +12,12 @@ function assert(condition: unknown, message: string): asserts condition {
   if (!condition) throw new Error(message);
 }
 
+async function closeHttpServer(server: Server): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.close(error => error ? reject(error) : resolve());
+  });
+}
+
 async function main() {
   for (const file of REQUIRED_FILES) assert(existsSync(file), `missing required file: ${file}`);
 
@@ -19,7 +26,7 @@ async function main() {
   assert(/2025-11-25/.test(readme), 'README must document MCP protocol 2025-11-25');
   assert(/Streamable HTTP/i.test(readme), 'README must document Streamable HTTP');
 
-  const { port, host } = await startServer(0, '127.0.0.1');
+  const { port, host, server: httpServer } = await startServer(0, '127.0.0.1');
   const transport = new StreamableHTTPClientTransport(new URL(`http://${host}:${port}/mcp`));
   const client = new Client({ name: 'pantrypilot-judge-check', version: '0.1.0' });
 
@@ -47,9 +54,10 @@ async function main() {
       submissionMetadataPresent: true
     }, null, 2));
   } finally {
-    // Never call process.exit() here: doing so masks exceptions thrown above and
-    // makes a broken judge path look green in CI. Let failures reach main().catch.
+    // Close both sides. Closing only the MCP client leaves the listening HTTP
+    // server alive, which keeps Node's event loop open and makes CI hang.
     await client.close().catch(() => undefined);
+    await closeHttpServer(httpServer).catch(() => undefined);
   }
 }
 
