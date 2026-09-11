@@ -3,6 +3,7 @@
  * Used when Bedrock is not configured (or as fallback after a Bedrock error).
  */
 import type { MealSlot, MealIngredient, MediaCard } from './state.js';
+import { mealSlotAllergenHits, normalizeAllergyList } from './gates.js';
 
 const PLACEHOLDER_MEAL_IMAGE =
   'https://example.com/img/meal-placeholder.png';
@@ -40,8 +41,14 @@ function enrichSlot(slot: Omit<MealSlot, 'mediaCard'> & { mediaCard?: MediaCard 
 }
 
 /** Deterministic meal-plan stub from prefs + pantry presence. */
-export function buildMealPlanStub(days: number, servings: number, diet: string[]): MealSlot[] {
+export function buildMealPlanStub(
+  days: number,
+  servings: number,
+  diet: string[],
+  allergies: string[] = []
+): MealSlot[] {
   const vegetarian = diet.some(d => /veg/i.test(d));
+  const allergyList = normalizeAllergyList(allergies);
   const templates: Array<
     Omit<MealSlot, 'day' | 'mediaCard' | 'description' | 'tags' | 'estimatedMinutes'> & {
       description?: string;
@@ -120,13 +127,41 @@ export function buildMealPlanStub(days: number, servings: number, diet: string[]
         }
       ];
 
+  // Drop templates that conflict with declared allergies before expanding days.
+  const safeTemplates = allergyList.length
+    ? templates.filter((t) => {
+        const probe = enrichSlot({
+          day: '1970-01-01',
+          ...t
+        });
+        return mealSlotAllergenHits(probe, allergyList).length === 0;
+      })
+    : templates;
+
+  // If every template conflicts, fall back to a minimal allergen-safe bowl.
+  const effective =
+    safeTemplates.length > 0
+      ? safeTemplates
+      : [
+          {
+            meal: 'lunch' as const,
+            title: 'Rice and olive oil bowl',
+            ingredients: [
+              { name: 'rice', quantity: 1 * servings, unit: 'cup' },
+              { name: 'olive oil', quantity: 1 * servings, unit: 'tbsp' }
+            ],
+            tags: ['lunch', 'allergen-safe', 'simple'],
+            estimatedMinutes: 20
+          }
+        ];
+
   const out: MealSlot[] = [];
   const start = new Date();
   for (let i = 0; i < days; i++) {
     const d = new Date(start);
     d.setUTCDate(start.getUTCDate() + i);
     const day = d.toISOString().slice(0, 10);
-    for (const t of templates) {
+    for (const t of effective) {
       out.push(enrichSlot({ day, ...t }));
     }
   }

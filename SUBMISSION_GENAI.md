@@ -32,7 +32,9 @@ See [`PREEXISTING.md`](./PREEXISTING.md) and tag `baseline/pre-genai-2026-10-14`
 
 **Declare as pre-existing if merged before 2026-10-15 UTC:** SQLite, `kitchen_run`, companion, evals, adversarial host/unit fixes, MCP resources/prompts.
 
-**Keep for Oct 15–20 scored delta (planned):** ≥2 live external data sources (Open Food Facts + CSV/receipt ingest), hard allergen/budget gates + Impact metrics, hardened public HTTPS judge path.
+**Keep for Oct 15–20 scored delta (planned):** ≥2 live external data sources (Open Food Facts + CSV/receipt ingest), Impact metrics polish, hardened public HTTPS judge path.
+
+**Landed (pre-window material):** hard allergen/budget gates (`src/gates.ts`) + Open Food Facts enrichment hook with offline fallback (`src/openfoodfacts.ts`) — see `FAILURE_MODES.md` §9 and evals `allergen_gate_*` / `budget_gate_*`.
 
 ## Judge demo (local, no secrets)
 

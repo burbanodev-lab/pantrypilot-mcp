@@ -138,7 +138,7 @@ export function registerResourcesAndPrompts(server: McpServer): void {
                 'Expiring soon:',
                 expiring || '(none tagged with expiresAt yet — stock pantry first)',
                 '',
-                'Respect allergies/avoid prefs. Cart stays mock draft only.'
+                'Respect allergies/avoid prefs (hard-gated). Cart stays mock draft only; budgetCents is a hard ceiling.'
               ].join('\n')
             }
           }
@@ -176,8 +176,8 @@ export function registerResourcesAndPrompts(server: McpServer): void {
           : undefined;
       const budgetLine =
         budget !== undefined && Number.isFinite(budget)
-          ? `Pass budgetCents=${Math.trunc(budget)}. Soft budget hint only.`
-          : 'Budget optional — omit budgetCents unless the household set one.';
+          ? `Pass budgetCents=${Math.trunc(budget)}. Hard budget ceiling on cart_draft.`
+          : 'Budget optional — omit budgetCents unless the household set a hard ceiling.';
       return {
         description: 'Run the weekly kitchen agent loop',
         messages: [

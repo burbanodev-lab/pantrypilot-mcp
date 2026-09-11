@@ -13,6 +13,8 @@ export type ProductCard = {
   currency: 'USD';
   unit: string;
   keywords: string[];
+  /** Declared allergen tokens for hard gating (subset of common names). */
+  allergens?: string[];
   imageUrl: string;
   detailPageUrl: string;
   rating: number;
@@ -30,6 +32,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'oz',
     keywords: ['oats', 'oatmeal', 'breakfast', 'granola'],
+    allergens: ['gluten'],
     imageUrl: 'https://example.com/img/oats.png',
     detailPageUrl: 'https://example.com/dp/B0PP-OATS-001',
     rating: 4.7,
@@ -45,6 +48,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'gallon',
     keywords: ['milk', 'dairy', 'whole milk'],
+    allergens: ['milk', 'dairy'],
     imageUrl: 'https://example.com/img/milk.png',
     detailPageUrl: 'https://example.com/dp/B0PP-MILK-002',
     rating: 4.5,
@@ -60,6 +64,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'count',
     keywords: ['eggs', 'breakfast', 'baking'],
+    allergens: ['eggs'],
     imageUrl: 'https://example.com/img/eggs.png',
     detailPageUrl: 'https://example.com/dp/B0PP-EGGS-003',
     rating: 4.6,
@@ -75,6 +80,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'lb',
     keywords: ['rice', 'jasmine', 'grain', 'dinner'],
+    allergens: [],
     imageUrl: 'https://example.com/img/rice.png',
     detailPageUrl: 'https://example.com/dp/B0PP-RICE-004',
     rating: 4.8,
@@ -90,6 +96,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'lb',
     keywords: ['chicken', 'protein', 'dinner'],
+    allergens: ['chicken'],
     imageUrl: 'https://example.com/img/chicken.png',
     detailPageUrl: 'https://example.com/dp/B0PP-CHKN-005',
     rating: 4.4,
@@ -105,6 +112,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'oz',
     keywords: ['tomatoes', 'canned', 'sauce', 'pasta'],
+    allergens: [],
     imageUrl: 'https://example.com/img/tomatoes.png',
     detailPageUrl: 'https://example.com/dp/B0PP-TOMA-006',
     rating: 4.3,
@@ -120,6 +128,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'oz',
     keywords: ['pasta', 'spaghetti', 'dinner', 'carbs'],
+    allergens: ['wheat', 'gluten'],
     imageUrl: 'https://example.com/img/pasta.png',
     detailPageUrl: 'https://example.com/dp/B0PP-PSTA-007',
     rating: 4.6,
@@ -135,6 +144,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'ml',
     keywords: ['olive oil', 'oil', 'cooking'],
+    allergens: [],
     imageUrl: 'https://example.com/img/oliveoil.png',
     detailPageUrl: 'https://example.com/dp/B0PP-OLIV-008',
     rating: 4.7,
@@ -150,6 +160,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'bunch',
     keywords: ['banana', 'fruit', 'snack', 'breakfast'],
+    allergens: [],
     imageUrl: 'https://example.com/img/bananas.png',
     detailPageUrl: 'https://example.com/dp/B0PP-BANA-009',
     rating: 4.2,
@@ -165,6 +176,7 @@ export const MOCK_CATALOG: ProductCard[] = [
     currency: 'USD',
     unit: 'oz',
     keywords: ['yogurt', 'greek', 'breakfast', 'protein'],
+    allergens: ['milk', 'dairy'],
     imageUrl: 'https://example.com/img/yogurt.png',
     detailPageUrl: 'https://example.com/dp/B0PP-YGRT-010',
     rating: 4.5,
