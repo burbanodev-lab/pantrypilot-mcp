@@ -31,7 +31,7 @@ Repository docs are Amazon Alexa+-first; GenAI Open Agent material demoted to ap
 | Budget gate | **PASS** | Eval `budget_gate_rejects_over_ceiling` PASS |
 | No secrets observed | **PASS** | `.env` gitignored; only `.env.example` tracked (placeholders). Grep: no live AWS keys/tokens in tree (comment placeholders only) |
 | Judge-facing links open logged out | **MIXED** | Repo **PASS**; YouTube **PASS** (200 + oEmbed); Devpost **UNVERIFIED** (403 from this egress); hosted `/health` **PASS** 200; hosted `/mcp` **401 Bearer** (expected — documented) |
-| Final CI green | **UNVERIFIED** (this PR) | `main` latest CI **success**. CI for this PR runs after push. |
+| Final CI green | **PASS** | PR #10 CI run 34640789547 success (Node 20 + 22 verify-submission). |
 | README Amazon-first + Judge Quick Start | **PASS** | Updated; GenAI section demoted to appendix; Devpost + video linked; mock-cart safety prominent; tool count aligned to live `tools/list` (11) |
 | SUBMISSION.md gates current | **PASS** | Video published + Devpost SUBMITTED checked; live Bedrock optional, not blocker |
 | FAILURE_MODES.md Amazon language | **PASS** | GenAI draft framing removed |
