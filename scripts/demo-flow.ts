@@ -86,7 +86,10 @@ async function main() {
 
       const payload = structured(result);
       if (name === 'kitchen_run' && payload) {
-        const source = payload.source ?? payload.modelSource ?? payload.provider;
+        // kitchen_run exposes the model path as mealPlanSource. Keep the
+        // compatibility aliases for older payloads, but prefer the actual
+        // current contract so the judge demo cannot falsely report unknown.
+        const source = payload.mealPlanSource ?? payload.source ?? payload.modelSource ?? payload.provider;
         if (typeof source === 'string') evidence.kitchenRunSource = source;
       }
       if (name === 'session_recall') {
