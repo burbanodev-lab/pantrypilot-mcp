@@ -131,6 +131,52 @@ async function main() {
       });
     }
 
+    // --- Shop list: partial pantry + same ingredient across 2 meal days ---
+    // Stub breakfast needs 2*servings eggs/day. servings=1, days=2 → total 4.
+    // Pantry eggs=1 → correct shopQty=3. Buggy per-meal shortfall reuse → 2.
+    try {
+      const hid = 'eval-shop-undercount';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: { householdId: hid, diet: ['omnivore'], servings: 1 }
+      });
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [{ name: 'eggs', quantity: 1, unit: 'count' }]
+        }
+      });
+      await client.callTool({
+        name: 'meal_plan',
+        arguments: { householdId: hid, days: 2 }
+      });
+      const shop = parseJson(
+        await client.callTool({
+          name: 'shop_list_build',
+          arguments: { householdId: hid }
+        })
+      );
+      const shopList = (shop.shopList as { name: string; quantity: number; unit: string }[]) ?? [];
+      const eggs = shopList.find(
+        (l) => l.name.toLowerCase() === 'eggs' && l.unit.toLowerCase() === 'count'
+      );
+      const ok = !!eggs && eggs.quantity === 3;
+      results.push({
+        name: 'shop_list_partial_pantry_multi_meal',
+        ok,
+        detail: ok
+          ? `eggs shopQty=${eggs!.quantity} (totalNeed=4 pantry=1)`
+          : `expected eggs quantity 3, got ${eggs ? eggs.quantity : 'missing'}; lines=${shopList.length}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'shop_list_partial_pantry_multi_meal',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
     let failed = 0;
     for (const r of results) {
       const mark = r.ok ? 'PASS' : 'FAIL';

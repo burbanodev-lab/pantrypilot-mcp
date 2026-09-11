@@ -31,27 +31,43 @@ const householdIdField = z
   .describe('Household key. Defaults to session-bound household or "default".');
 
 function buildShopList(h: HouseholdState): ShopLine[] {
-  const needed = new Map<string, ShopLine>();
+  // Aggregate total required per pantry key across all meal slots first,
+  // then subtract pantry once. Per-slot shortfall summation would reuse
+  // the full pantry stock for every meal and under-count the shop list.
+  type Agg = { name: string; unit: string; totalRequired: number; reasons: string[] };
+  const required = new Map<string, Agg>();
   for (const slot of h.mealPlan) {
     for (const ing of slot.ingredients) {
       const key = pantryKey(ing.name, ing.unit);
-      const have = h.pantry.get(key)?.quantity ?? 0;
-      const shortfall = Math.max(0, ing.quantity - have);
-      if (shortfall <= 0) continue;
-      const existing = needed.get(key);
+      const reason = `Needed for ${slot.title} on ${slot.day}`;
+      const existing = required.get(key);
       if (existing) {
-        existing.quantity += shortfall;
+        existing.totalRequired += ing.quantity;
+        if (!existing.reasons.includes(reason)) existing.reasons.push(reason);
       } else {
-        needed.set(key, {
+        required.set(key, {
           name: ing.name,
-          quantity: shortfall,
           unit: ing.unit,
-          reason: `Needed for ${slot.title} on ${slot.day}`
+          totalRequired: ing.quantity,
+          reasons: [reason]
         });
       }
     }
   }
-  return [...needed.values()].sort((a, b) => a.name.localeCompare(b.name));
+
+  const needed: ShopLine[] = [];
+  for (const [key, agg] of required) {
+    const have = h.pantry.get(key)?.quantity ?? 0;
+    const shopQty = Math.max(0, agg.totalRequired - have);
+    if (shopQty <= 0) continue;
+    needed.push({
+      name: agg.name,
+      quantity: shopQty,
+      unit: agg.unit,
+      reason: agg.reasons.join('; ')
+    });
+  }
+  return needed.sort((a, b) => a.name.localeCompare(b.name));
 }
 
 async function resolveMealPlan(
