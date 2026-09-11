@@ -67,11 +67,10 @@ async function main() {
     console.log('\nDEMO FLOW PASSED');
   } finally {
     await client.close().catch(() => undefined);
-    process.exit(0);
   }
 }
 
 main().catch(error => {
   console.error('DEMO FLOW FAILED', error);
-  process.exit(1);
+  process.exitCode = 1;
 });
