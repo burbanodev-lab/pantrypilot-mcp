@@ -5,10 +5,15 @@ import { startServer } from '../src/server.js';
 const REQUIRED_PROTOCOL = '2025-11-25';
 const calls: Array<[string, Record<string, unknown>]> = [
   ['session_recall', { householdId: 'alexa-demo' }],
-  ['pantry_upsert', { householdId: 'alexa-demo', name: 'eggs', quantity: 6, unit: 'count' }],
-  ['pantry_upsert', { householdId: 'alexa-demo', name: 'rice', quantity: 2, unit: 'cups' }],
+  ['pantry_upsert', {
+    householdId: 'alexa-demo',
+    items: [
+      { name: 'eggs', quantity: 6, unit: 'count' },
+      { name: 'rice', quantity: 2, unit: 'cups' }
+    ]
+  }],
   ['prefs_set', { householdId: 'alexa-demo', diet: ['omnivore'], servings: 2 }],
-  ['kitchen_run', { householdId: 'alexa-demo', days: 3, goal: 'reduce food waste' }],
+  ['kitchen_run', { householdId: 'alexa-demo', days: 3, goal: 'use_expiring' }],
   ['session_recall', { householdId: 'alexa-demo' }],
 ];
 
