@@ -5,6 +5,7 @@ const requiredFiles = [
   'README.md',
   'SUBMISSION.md',
   'src/server.ts',
+  'src/bedrock.ts',
   'scripts/mcp-conformance.ts',
   'scripts/demo-flow.ts',
   'JUDGE_CARD.md',
@@ -14,6 +15,7 @@ const requiredFiles = [
 const read = (path: string) => existsSync(path) ? readFileSync(path, 'utf8') : '';
 const submission = read('SUBMISSION.md');
 const server = read('src/server.ts');
+const bedrock = read('src/bedrock.ts');
 const conformance = read('scripts/mcp-conformance.ts');
 const demo = read('scripts/demo-flow.ts');
 const pkg = JSON.parse(readFileSync('package.json', 'utf8')) as {
@@ -32,6 +34,9 @@ const checks: Array<[string, boolean]> = [
   ['session lifecycle implemented', /mcp-session-id/i.test(server) && /app\.delete\(['"]\/mcp['"]/.test(server)],
   ['raw-wire conformance targets required protocol', /2025-11-25/.test(conformance)],
   ['Bedrock SDK dependency present', Boolean(pkg.dependencies?.['@aws-sdk/client-bedrock-runtime'])],
+  ['Bedrock runtime implementation present', /BedrockRuntimeClient/.test(bedrock) && /ConverseCommand/.test(bedrock) && /client\.send\(/.test(bedrock)],
+  ['Bedrock runtime is configuration-gated', /AWS_REGION/.test(bedrock) && /BEDROCK_MODEL_ID/.test(bedrock)],
+  ['Bedrock output is validated before use', /extractJsonArray/.test(bedrock) && /normalizeMealSlot/.test(bedrock) && /no valid slots/i.test(bedrock)],
   ['AWS Builder section present', /### AWS Builder/.test(submission)],
   ['Open Source section present', /### Open Source/.test(submission)],
   ['product feedback present', /## Product feedback/.test(submission)],
