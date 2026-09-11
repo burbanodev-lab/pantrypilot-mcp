@@ -18,9 +18,25 @@ const calls: Array<[string, Record<string, unknown>]> = [
 ];
 
 function structured(result: Awaited<ReturnType<Client['callTool']>>): Record<string, unknown> | undefined {
-  return result.structuredContent && typeof result.structuredContent === 'object'
-    ? result.structuredContent as Record<string, unknown>
-    : undefined;
+  if (result.structuredContent && typeof result.structuredContent === 'object') {
+    return result.structuredContent as Record<string, unknown>;
+  }
+
+  // PantryPilot tools intentionally return MCP text content for broad client
+  // compatibility. Parse the JSON text so judge evidence reflects the actual
+  // tool result instead of incorrectly reporting unknown/false.
+  const text = result.content?.find(
+    (item): item is Extract<(typeof result.content)[number], { type: 'text' }> => item.type === 'text'
+  );
+  if (!text) return undefined;
+  try {
+    const parsed: unknown = JSON.parse(text.text);
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? parsed as Record<string, unknown>
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 async function main() {
@@ -58,10 +74,17 @@ async function main() {
       if (name === 'session_recall') finalRecall = payload;
 
       console.log(`\n=== ${name} ===`);
-      console.log(JSON.stringify(result.structuredContent ?? result.content, null, 2));
+      console.log(JSON.stringify(payload ?? result.content, null, 2));
     }
 
     evidence.persistentRecallObserved = Boolean(finalRecall && Object.keys(finalRecall).length > 0);
+    if (evidence.kitchenRunSource === 'unknown') {
+      throw new Error('kitchen_run completed but demo could not verify its model source');
+    }
+    if (!evidence.persistentRecallObserved) {
+      throw new Error('demo could not verify persisted household/session recall');
+    }
+
     console.log('\n=== JUDGE EVIDENCE SUMMARY ===');
     console.log(JSON.stringify(evidence, null, 2));
     console.log('\nDEMO FLOW PASSED');
