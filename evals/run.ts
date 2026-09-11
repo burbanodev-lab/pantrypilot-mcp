@@ -3,6 +3,7 @@
  * Spawns an ephemeral MCP server (same pattern as smoke). No secrets.
  */
 import { mkdtempSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
@@ -172,6 +173,149 @@ async function main() {
     } catch (err) {
       results.push({
         name: 'shop_list_partial_pantry_multi_meal',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+
+    // --- Unit aliases: pantry "cups" must match meal stub "cup" ---
+    try {
+      const hid = 'eval-unit-alias-cups';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: { householdId: hid, diet: ['omnivore'], servings: 1 }
+      });
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [{ name: 'rice', quantity: 100, unit: 'cups' }]
+        }
+      });
+      await client.callTool({
+        name: 'meal_plan',
+        arguments: { householdId: hid, days: 1 }
+      });
+      const shop = parseJson(
+        await client.callTool({
+          name: 'shop_list_build',
+          arguments: { householdId: hid }
+        })
+      );
+      const shopList = (shop.shopList as { name: string; quantity: number; unit: string }[]) ?? [];
+      const rice = shopList.find((l) => l.name.toLowerCase() === 'rice');
+      const ok = !rice;
+      results.push({
+        name: 'shop_list_unit_alias_cups_matches_cup',
+        ok,
+        detail: ok
+          ? 'rice absent from shop list (cups aliased to cup)'
+          : `expected no rice shortfall, got ${rice ? rice.quantity + ' ' + rice.unit : 'other lines=' + shopList.length}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'shop_list_unit_alias_cups_matches_cup',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    // --- Demo pantry units: milk as cup (not L) reduces shop shortfall ---
+    try {
+      const hid = 'eval-demo-milk-cup';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: { householdId: hid, diet: ['omnivore'], servings: 2 }
+      });
+      // Mirror companion sample pantry units after the adversarial fix.
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [
+            { name: 'eggs', quantity: 6, unit: 'count' },
+            { name: 'milk', quantity: 2, unit: 'cup', expiresAt: '2026-10-16' },
+            { name: 'rice', quantity: 2, unit: 'cup' }
+          ]
+        }
+      });
+      await client.callTool({
+        name: 'meal_plan',
+        arguments: { householdId: hid, days: 1 }
+      });
+      const shop = parseJson(
+        await client.callTool({
+          name: 'shop_list_build',
+          arguments: { householdId: hid }
+        })
+      );
+      const shopList = (shop.shopList as { name: string; quantity: number; unit: string }[]) ?? [];
+      const milk = shopList.find(
+        (l) => l.name.toLowerCase() === 'milk' && l.unit.toLowerCase() === 'cup'
+      );
+      // Stub breakfast needs 0.5*servings=1 cup milk for 1 day → pantry 2 covers it.
+      const ok = !milk;
+      results.push({
+        name: 'shop_list_demo_milk_cup_covered',
+        ok,
+        detail: ok
+          ? 'milk covered by pantry cup stock'
+          : `expected no milk shortfall, got ${milk ? milk.quantity : 'missing'}; lines=${JSON.stringify(shopList).slice(0, 200)}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'shop_list_demo_milk_cup_covered',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    // --- Host allow-list: public mcpize hostname accepted; unknown rejected ---
+    // Use raw http.request — undici fetch forbids overriding the Host header.
+    try {
+      const probe = (hostnameHeader: string) =>
+        new Promise<{ status: number; body: string }>((resolve, reject) => {
+          const req = httpRequest(
+            {
+              host: '127.0.0.1',
+              port,
+              path: '/health',
+              method: 'GET',
+              headers: { Host: hostnameHeader }
+            },
+            (res) => {
+              const chunks: Buffer[] = [];
+              res.on('data', (c) => chunks.push(c));
+              res.on('end', () =>
+                resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString('utf8') })
+              );
+            }
+          );
+          req.on('error', reject);
+          req.end();
+        });
+
+      const okRes = await probe('pantrypilot.mcpize.run');
+      const badRes = await probe('evil.example');
+      const okBody = JSON.parse(okRes.body) as { ok?: boolean; name?: string };
+      const badBody = JSON.parse(badRes.body) as { error?: { message?: string } };
+      const ok =
+        okRes.status === 200 &&
+        okBody.ok === true &&
+        okBody.name === 'pantrypilot-mcp' &&
+        badRes.status === 403 &&
+        /Invalid Host/i.test(String(badBody.error?.message ?? ''));
+      results.push({
+        name: 'allowed_hosts_mcpize_public_hostname',
+        ok,
+        detail: ok
+          ? 'pantrypilot.mcpize.run allowed; evil.example rejected'
+          : `okStatus=${okRes.status} badStatus=${badRes.status} okBody=${okRes.body.slice(0, 120)} badBody=${badRes.body.slice(0, 120)}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'allowed_hosts_mcpize_public_hostname',
         ok: false,
         detail: err instanceof Error ? err.message : String(err)
       });

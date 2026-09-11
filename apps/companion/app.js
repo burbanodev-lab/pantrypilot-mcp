@@ -153,6 +153,57 @@ function money(cents) {
   return `$${(Number(cents) / 100).toFixed(2)}`;
 }
 
+
+function renderKvList(elId, rows, emptyMsg) {
+  const root = $(elId);
+  root.innerHTML = '';
+  if (!rows?.length) {
+    root.innerHTML = `<li class="empty">${escapeHtml(emptyMsg)}</li>`;
+    return;
+  }
+  for (const row of rows) {
+    const li = document.createElement('li');
+    li.innerHTML =
+      `<span>${escapeHtml(row.left)}</span>` +
+      `<span class="meta">${escapeHtml(row.right)}</span>`;
+    root.appendChild(li);
+  }
+}
+
+function renderPantry(items) {
+  renderKvList(
+    'pantryList',
+    (items || []).map((i) => ({
+      left: i.name,
+      right: `${i.quantity} ${i.unit}${i.expiresAt ? ` · exp ${i.expiresAt}` : ''}`
+    })),
+    'Stock sample pantry to populate.'
+  );
+}
+
+function renderShop(list) {
+  renderKvList(
+    'shopList',
+    (list || []).map((s) => ({
+      left: s.name,
+      right: `${s.quantity} ${s.unit}`
+    })),
+    'Run kitchen to compute shortfalls.'
+  );
+}
+
+function renderCart(cart) {
+  const lines = cart?.lines || [];
+  renderKvList(
+    'cartList',
+    lines.map((l) => ({
+      left: l.title || l.asin,
+      right: `×${l.quantity} · ${money(l.priceCents * l.quantity)}`
+    })),
+    'No cart yet.'
+  );
+}
+
 async function stockPantry() {
   const householdId = $('householdId').value.trim() || 'demo';
   $('btnStock').disabled = true;
@@ -169,12 +220,16 @@ async function stockPantry() {
       householdId,
       items: [
         { name: 'eggs', quantity: 6, unit: 'count' },
-        { name: 'milk', quantity: 1, unit: 'L', expiresAt: '2026-10-16' },
+        { name: 'milk', quantity: 2, unit: 'cup', expiresAt: '2026-10-16' },
         { name: 'rice', quantity: 2, unit: 'cup' },
         { name: 'onion', quantity: 2, unit: 'count' }
       ]
     });
-    log('sample pantry + prefs ready');
+    const pantry = await callTool('pantry_query', { householdId });
+    renderPantry(pantry.items || []);
+    renderShop([]);
+    renderCart(null);
+    log(`sample pantry + prefs ready (items=${pantry.count ?? pantry.items?.length ?? 0})`);
     setStatus('ok', 'Pantry stocked');
   } catch (err) {
     setStatus('err', 'Stock failed');
@@ -203,14 +258,25 @@ async function runKitchen() {
     const payload = await callTool('kitchen_run', args);
     renderSteps(payload.steps || []);
     renderCards(payload.mediaCards || []);
+    renderShop(payload.shopList || []);
+    renderCart(payload.cart);
+    const recall = await callTool('session_recall', { householdId });
+    // Prefer live pantry_query for full item rows when available.
+    try {
+      const pantry = await callTool('pantry_query', { householdId });
+      renderPantry(pantry.items || []);
+    } catch {
+      /* session_recall may still prove count for the log */
+    }
     const cart = payload.cart;
     $('summary').textContent =
       `ok=${payload.ok} · ${payload.totalMs}ms · meals=${payload.mealPlan?.length ?? 0}` +
       ` · shop=${payload.shopList?.length ?? 0}` +
       ` · cart=${cart ? `${cart.lines?.length ?? 0} lines / ${money(cart.totalCents)}` : 'none'}` +
-      ` · source=${payload.mealPlanSource}`;
+      ` · source=${payload.mealPlanSource}` +
+      ` · pantry=${recall.pantryCount ?? '?'}`;
     setStatus(payload.ok ? 'ok' : 'err', payload.ok ? 'Run complete' : 'Partial run');
-    log(`kitchen_run ok=${payload.ok} cards=${payload.mediaCards?.length ?? 0}`);
+    log(`kitchen_run ok=${payload.ok} cards=${payload.mediaCards?.length ?? 0} shop=${payload.shopList?.length ?? 0}`);
   } catch (err) {
     setStatus('err', 'Run failed');
     log(String(err?.message || err));
@@ -227,4 +293,7 @@ $('mcpUrl').addEventListener('change', () => {
 });
 
 renderCards([]);
+renderPantry([]);
+renderShop([]);
+renderCart(null);
 log('Ready. Stock pantry, then Run weekly kitchen.');
