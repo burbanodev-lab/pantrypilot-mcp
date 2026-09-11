@@ -7,7 +7,7 @@ services:
       HOST: "0.0.0.0"
       PORT: "3000"
       # Include compose hostname / localhost for Host header validation
-      ALLOWED_HOSTS: "localhost,127.0.0.1,::1,pantrypilot-mcp"
+      ALLOWED_HOSTS: "localhost,127.0.0.1,::1,pantrypilot-mcp,pantrypilot.mcpize.run"
       DATABASE_PATH: "/data/pantrypilot.sqlite"
       # Optional Bedrock (pass via host env / secrets — never bake keys into the image)
       AWS_REGION: "${AWS_REGION:-}"

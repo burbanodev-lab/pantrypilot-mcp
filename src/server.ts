@@ -32,10 +32,29 @@ function resolveCompanionDir(): string | null {
 
 const PORT = Number(process.env.PORT ?? 3000);
 const HOST = process.env.HOST ?? '127.0.0.1';
-const ALLOWED_HOSTS = (process.env.ALLOWED_HOSTS ?? 'localhost,127.0.0.1,::1')
-  .split(',')
-  .map(s => s.trim())
-  .filter(Boolean);
+
+/** Host header allow-list for MCP SDK DNS-rebinding protection. */
+function resolveAllowedHosts(): string[] {
+  const hosts = new Set(
+    (process.env.ALLOWED_HOSTS ?? 'localhost,127.0.0.1,::1')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean)
+  );
+  // Documented Live MCP hostname (PREEXISTING.md) — required for mcpize / Docker demos.
+  hosts.add('pantrypilot.mcpize.run');
+  const publicUrl = process.env.MCP_PUBLIC_URL?.trim();
+  if (publicUrl) {
+    try {
+      hosts.add(new URL(publicUrl).hostname);
+    } catch {
+      /* ignore invalid MCP_PUBLIC_URL */
+    }
+  }
+  return [...hosts];
+}
+
+const ALLOWED_HOSTS = resolveAllowedHosts();
 
 export function createPantryPilotServer(): McpServer {
   const server = new McpServer(

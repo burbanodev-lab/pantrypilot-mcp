@@ -105,8 +105,42 @@ function nowIso(): string {
   return new Date().toISOString();
 }
 
+/** Collapse common plural / alias units so pantry and meal stubs match. */
+export function normalizeUnit(unit: string): string {
+  const u = unit.trim().toLowerCase();
+  const aliases: Record<string, string> = {
+    cups: 'cup',
+    tbsps: 'tbsp',
+    tbsp: 'tbsp',
+    tablespoons: 'tbsp',
+    tablespoon: 'tbsp',
+    tsps: 'tsp',
+    tsp: 'tsp',
+    teaspoons: 'tsp',
+    teaspoon: 'tsp',
+    lbs: 'lb',
+    lb: 'lb',
+    pounds: 'lb',
+    pound: 'lb',
+    ounces: 'oz',
+    ounce: 'oz',
+    ozs: 'oz',
+    oz: 'oz',
+    counts: 'count',
+    count: 'count',
+    cans: 'can',
+    can: 'can',
+    litres: 'l',
+    liters: 'l',
+    litre: 'l',
+    liter: 'l',
+    l: 'l'
+  };
+  return aliases[u] ?? u;
+}
+
 export function pantryKey(name: string, unit: string): string {
-  return `${name.trim().toLowerCase()}::${unit.trim().toLowerCase()}`;
+  return `${name.trim().toLowerCase()}::${normalizeUnit(unit)}`;
 }
 
 function emptyHousehold(id: string): HouseholdState {

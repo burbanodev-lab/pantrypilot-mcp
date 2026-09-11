@@ -9,7 +9,7 @@ const calls: Array<[string, Record<string, unknown>]> = [
     householdId: 'alexa-demo',
     items: [
       { name: 'eggs', quantity: 6, unit: 'count' },
-      { name: 'rice', quantity: 2, unit: 'cups' }
+      { name: 'rice', quantity: 2, unit: 'cup' }
     ]
   }],
   ['prefs_set', { householdId: 'alexa-demo', diet: ['omnivore'], servings: 2 }],
