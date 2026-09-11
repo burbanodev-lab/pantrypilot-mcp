@@ -1,0 +1,65 @@
+name: Agents for Humans Strands
+
+on:
+  push:
+    branches:
+      - 'agents-for-humans/**'
+      - main
+    paths:
+      - 'agents-for-humans/**'
+      - '.github/workflows/agents-for-humans.yml'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+  pull_request:
+    paths:
+      - 'agents-for-humans/**'
+      - '.github/workflows/agents-for-humans.yml'
+      - 'src/**'
+      - 'package.json'
+      - 'package-lock.json'
+
+jobs:
+  verify-strands-mcp:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install and build PantryPilot MCP
+        run: |
+          npm ci
+          npm run build
+
+      - name: Start PantryPilot MCP
+        run: |
+          npm start > /tmp/pantrypilot.log 2>&1 &
+          echo $! > /tmp/pantrypilot.pid
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:3000/health >/dev/null; then
+              exit 0
+            fi
+            sleep 1
+          done
+          cat /tmp/pantrypilot.log
+          exit 1
+
+      - name: Install Strands subproject
+        working-directory: agents-for-humans
+        run: npm install
+
+      - name: Build Strands subproject
+        working-directory: agents-for-humans
+        run: npm run build
+
+      - name: Verify Strands MCP discovery and invocation
+        working-directory: agents-for-humans
+        run: npm run judge-check
+
+      - name: Show MCP log on failure
+        if: failure()
+        run: cat /tmp/pantrypilot.log || true
