@@ -36,12 +36,17 @@ These land after the baseline tag. If merged **before** 2026-10-15 UTC, also dec
 | `evals/` + `npm run eval` | Happy-path pantry→meal→cart + soft-fail `cart_confirm` |
 | `FAILURE_MODES.md` | Judge-oriented failure documentation (bonus) |
 
+## Prep landed after companion/evals (declare if merged pre-window)
+
+| Item | Purpose |
+|------|---------|
+| MCP resources + prompts (`src/mcp-extras.ts`) | `pantry://agent/overview`, `pantry://household/{id}`, prompts `use_up_expiring` + `weekly_kitchen` |
+
 ## Still planned during Oct 15–20 window
 
 1. ≥2 real external data sources (e.g. Open Food Facts + receipt/CSV ingest)
-2. MCP resources + prompts (`pantry://…`, `use_up_expiring`)
-3. Hard allergen / budget gates + Impact metrics polish
-4. Hardened public HTTPS judge path / demo fixtures
+2. Hard allergen / budget gates + Impact metrics polish
+3. Hardened public HTTPS judge path / demo fixtures (MCPize Bearer vs local Docker companion)
 
 ## Positioning
 
@@ -53,6 +58,6 @@ These land after the baseline tag. If merged **before** 2026-10-15 UTC, also dec
 
 ```bash
 git fetch --tags
-git log --oneline baseline/pre-genai-2026-10-14..genai/open-agent-2026
-git diff baseline/pre-genai-2026-10-14...genai/open-agent-2026
+git log --oneline baseline/pre-genai-2026-10-14..main
+git diff baseline/pre-genai-2026-10-14...main
 ```

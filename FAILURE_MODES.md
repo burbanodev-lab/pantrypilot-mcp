@@ -13,7 +13,7 @@ Draft for GenAI Open Agent judges. Goal: document real (and anticipated) failure
 | 5 | Host header rejected | HTTP 403 from Express host allow-list | Med | Set `ALLOWED_HOSTS` for deploy hostname |
 | 6 | Stale / missing MCP session | `400 Bad Request: No valid session ID` | Med | Client must `initialize` then send `mcp-session-id` |
 | 7 | Catalog miss on ingredient | Shop line skipped in cart draft | Med | Mock catalog coverage; label demo as mock shopping |
-| 8 | mcpize / public URL auth friction | Judges get 401 on HTTPS URL | High | Ship `docker compose up --build` one-command; document `/health` |
+| 8 | mcpize / public URL auth friction | Judges get 401 on HTTPS `/mcp` (or bare path) with `Bearer token required` | High | **Expected** MCPize gateway OAuth — `/health` stays 200 public; demo via local `docker compose` `/companion/` or authorized Bearer |
 | 9 | Over-budget / allergy not hard-gated | Plan may still include allergens or ignore budget | Med | Prefs stored + shown; hard filters planned for scored window |
 | 10 | Companion CORS / wrong MCP URL | Browser fetch fails when UI ≠ MCP origin | Low | Serve companion from same Express app at `/companion/` |
 

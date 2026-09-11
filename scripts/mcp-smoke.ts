@@ -66,6 +66,23 @@ async function main() {
     }
     console.log('OK required tools present (incl. kitchen_run)');
 
+    const resources = await client.listResources();
+    const resourceUris = (resources.resources ?? []).map((r) => r.uri);
+    if (!resourceUris.some((u) => u.startsWith('pantry://'))) {
+      throw new Error(`expected pantry:// resources, got ${JSON.stringify(resourceUris)}`);
+    }
+    console.log(`OK resources/list count=${resourceUris.length}`);
+
+    const prompts = await client.listPrompts();
+    const promptNames = (prompts.prompts ?? []).map((p) => p.name).sort();
+    for (const required of ['use_up_expiring', 'weekly_kitchen']) {
+      if (!promptNames.includes(required)) {
+        throw new Error(`missing required prompt: ${required}`);
+      }
+    }
+    console.log(`OK prompts/list ${promptNames.join(', ')}`);
+
+
     const recall = await client.callTool({
       name: 'session_recall',
       arguments: { householdId: 'smoke-home' }

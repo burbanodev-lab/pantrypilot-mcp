@@ -321,6 +321,68 @@ async function main() {
       });
     }
 
+
+    // --- MCP resources + prompts (GenAI Track 04/05 surface) ---
+    try {
+      const hid = 'eval-resources-prompts';
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [
+            { name: 'milk', quantity: 1, unit: 'cup', expiresAt: '2026-10-16' },
+            { name: 'spinach', quantity: 1, unit: 'bag', expiresAt: '2026-10-15' }
+          ]
+        }
+      });
+
+      const resources = await client.listResources();
+      const uris = (resources.resources ?? []).map((r: { uri: string }) => r.uri);
+      const hasOverview = uris.includes('pantry://agent/overview');
+      const householdUri = uris.find((u: string) => u.includes(encodeURIComponent(hid)) || u.endsWith(`/${hid}`));
+
+      const read = await client.readResource({
+        uri: householdUri ?? `pantry://household/${hid}`
+      });
+      const text = (read.contents?.[0] as { text?: string } | undefined)?.text ?? '';
+      const snap = JSON.parse(text) as { householdId?: string; pantryCount?: number; expiringSoon?: unknown[] };
+      const prompts = await client.listPrompts();
+      const promptNames = (prompts.prompts ?? []).map((p: { name: string }) => p.name);
+      const gotPrompt = await client.getPrompt({
+        name: 'use_up_expiring',
+        arguments: { householdId: hid, days: '2' }
+      });
+      const promptText = gotPrompt.messages?.[0]?.content;
+      const promptBody =
+        typeof promptText === 'object' && promptText && 'text' in promptText
+          ? String((promptText as { text: string }).text)
+          : '';
+
+      const ok =
+        hasOverview &&
+        snap.householdId === hid &&
+        (snap.pantryCount ?? 0) >= 2 &&
+        Array.isArray(snap.expiringSoon) &&
+        promptNames.includes('use_up_expiring') &&
+        promptNames.includes('weekly_kitchen') &&
+        /kitchen_run/i.test(promptBody) &&
+        /use_expiring/i.test(promptBody);
+
+      results.push({
+        name: 'resources_and_prompts_kitchen',
+        ok,
+        detail: ok
+          ? `overview+household snap pantry=${snap.pantryCount} prompts=${promptNames.length}`
+          : `hasOverview=${hasOverview} snap=${text.slice(0, 120)} prompts=${promptNames.join(',')} body=${promptBody.slice(0, 80)}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'resources_and_prompts_kitchen',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
     let failed = 0;
     for (const r of results) {
       const mark = r.ok ? 'PASS' : 'FAIL';

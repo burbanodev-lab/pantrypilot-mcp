@@ -322,6 +322,14 @@ export function dbResolveSession(sessionId: string): string | undefined {
   return String(rows[0].values[0][0]);
 }
 
+export function dbListHouseholdIds(): string[] {
+  if (!isDatabaseReady()) return [];
+  const database = getDb();
+  const rows = database.exec('SELECT household_id FROM households ORDER BY household_id');
+  if (rows.length === 0) return [];
+  return rows[0].values.map((v) => String(v[0]));
+}
+
 export function dbClearAll(): void {
   const database = getDb();
   database.run('DELETE FROM pantry_items');
