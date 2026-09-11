@@ -23,8 +23,8 @@ Official rules: https://amazonappdev2026.devpost.com/rules
 | Public repository | Required as part of working demo/code submission | COMPLIANT |
 | Product feedback | Required | DRAFTED in `SUBMISSION.md` / `FRICTION_LOG.md` |
 | Friction log | Optional; can add up to 10% judging bonus | DRAFTED |
-| Working demo | Required | IMPLEMENTED; public recording pending |
-| Demo video | YouTube or Vimeo, public, English, under 3 minutes | PENDING |
+| Working demo | Required | IMPLEMENTED |
+| Demo video | YouTube or Vimeo, public, English, under 3 minutes | URL PROVIDED: https://youtu.be/U24ZL9LqIsw — visibility/duration must be confirmed before final submit |
 | Final Devpost submission | Must be submitted before deadline | NOT YET INDEPENDENTLY EVIDENCED |
 
 ## Alexa+ technical compliance
@@ -70,8 +70,9 @@ Therefore this repository and its status reporting must keep these concepts sepa
 
 - [x] Devpost account reinstated.
 - [x] Register for the hackathon under the authorized entrant account.
+- [x] Demo video URL supplied: https://youtu.be/U24ZL9LqIsw
+- [ ] Confirm demo video is publicly viewable, in English, and under three minutes.
 - [ ] Capture a live authorized Bedrock-backed run if available, without exposing credentials.
-- [ ] Record and publish the public English demo video under three minutes.
 - [ ] Complete all Devpost project/submission fields, including Alexa+, AWS Builder, Open Source, product feedback, friction log, repository URL, testing instructions, and pre-existing-work answer if presented.
 - [ ] Submit the Devpost entry before October 23, 2026 at 12:00 PM PT.
 - [ ] Preserve submission confirmation/project URL as evidence and only then mark pipeline `SUBMITTED`.
