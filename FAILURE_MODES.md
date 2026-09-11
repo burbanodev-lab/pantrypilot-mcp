@@ -1,6 +1,6 @@
 # Failure modes — PantryPilot MCP
 
-Draft for GenAI Open Agent judges. Goal: document real (and anticipated) failures so other teams can learn, and so demo/ops expectations stay honest. **No secrets.** Mock cart never places Amazon orders.
+Judge-facing failure documentation for the **Amazon Developer Hackathon (Alexa+)** submission (shared language for any reviewer exercising the same MCP surface). Goal: document real failures so expectations stay honest. **No secrets.** Mock cart never places Amazon orders.
 
 ## Summary table
 
@@ -13,15 +13,22 @@ Draft for GenAI Open Agent judges. Goal: document real (and anticipated) failure
 | 5 | Host header rejected | HTTP 403 from Express host allow-list | Med | Set `ALLOWED_HOSTS` for deploy hostname |
 | 6 | Stale / missing MCP session | `400 Bad Request: No valid session ID` | Med | Client must `initialize` then send `mcp-session-id` |
 | 7 | Catalog miss on ingredient | Shop line skipped in cart draft | Med | Mock catalog coverage; label demo as mock shopping |
-| 8 | mcpize / public URL auth friction | Judges get 401 on HTTPS `/mcp` (or bare path) with `Bearer token required` | High | **Expected** MCPize gateway OAuth — `/health` stays 200 public; demo via local `docker compose` `/companion/` or authorized Bearer |
+| 8 | Hosted `/mcp` Bearer-auth friction | Judges get **401** on HTTPS `/mcp` with `Bearer token required` | High | **Expected** MCPize gateway OAuth — `/health` stays 200 public; demo via local `npm start` / `docker compose` `/companion/` or authorized Bearer. **Do not advertise gated `/mcp` as the main live demo.** |
 | 9 | Over-budget / allergy hard-gated | `{ code: "BUDGET_EXCEEDED" }` / `{ code: "ALLERGEN_BLOCKED" }` soft-fail JSON | Med | `src/gates.ts` enforces on meal_plan / product_search / cart_draft / kitchen_run |
 | 10 | Companion CORS / wrong MCP URL | Browser fetch fails when UI ≠ MCP origin | Low | Serve companion from same Express app at `/companion/` |
+
+## Judge access guidance (current)
+
+1. **Preferred:** clone → `npm ci` → `npm run verify-submission` → `npm start` → open `http://127.0.0.1:3000/companion/`.
+2. **Docker:** `docker compose up --build` → same companion URL on port 3000.
+3. **Hosted:** `https://pantrypilot.mcpize.run/health` is public. `https://pantrypilot.mcpize.run/mcp` requires Bearer — treat 401 as expected gateway auth, not a product defect.
+4. Prefer the published demo video + local companion over sending judges to a credential-gated MCP endpoint.
 
 ## Detail
 
 ### 1. Bedrock path fails closed to stub
 
-When `AWS_REGION` + `BEDROCK_MODEL_ID` (+ credentials) are missing or Converse errors, meal planning **does not abort** the agent loop. `kitchen_run` continues with stub slots and surfaces `bedrockError` when applicable. Demo video should not depend on live Bedrock.
+When `AWS_REGION` + `BEDROCK_MODEL_ID` (+ credentials) are missing or Converse errors, meal planning **does not abort** the agent loop. `kitchen_run` continues with stub slots and surfaces `bedrockError` when applicable. Demo video should not depend on live Bedrock. Docs must not claim a live `source: bedrock` capture unless one was actually recorded with authorized AWS access.
 
 ### 2–3. Cart confirm soft failures
 
@@ -39,7 +46,7 @@ Streamable HTTP is sessionful. Companion resets session on each “Run” for a 
 
 `matchProductForIngredient` may miss exotic stub ingredients → fewer cart lines than shop lines. Acceptable for hackathon mock; call out in demo narration.
 
-### 8. Judge access
+### 8. Hosted MCP auth
 
 Prefer showing companion + `/health` locally via compose if the hosted MCP URL is gated. Never paste API keys into the video or repo.
 
@@ -57,11 +64,12 @@ Static UI under `apps/companion` uses fetch JSON-RPC. Open `http://127.0.0.1:300
 ## How to reproduce key cases
 
 ```bash
-npm run eval          # happy path + cart_confirm failure
+npm run eval          # happy path + cart_confirm failure + gates
 npm run smoke         # protocol + kitchen_run smoke
 npm start             # then open /companion/
 ```
 
 ## Changelog
 
-- 2026-09-10 (America/Bogota): initial draft for GenAI prep (companion + evals PR).
+- 2026-09-11 (America/Bogota): reframed for Amazon Alexa+ judges; clarified hosted Bearer 401 guidance.
+- 2026-09-10 (America/Bogota): initial draft (companion + evals).

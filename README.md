@@ -2,25 +2,44 @@
 
 Greenfield **TypeScript** [Model Context Protocol](https://modelcontextprotocol.io) server for the **Amazon Developer Hackathon — Alexa+ track**.
 
-PantryPilot exposes household pantry, preferences, meal planning, shopping list, product search (mock catalog with card fields), and cart draft/confirm tools over **Streamable HTTP**. Protocol version negotiated on `initialize`: **`2025-11-25`**.
+PantryPilot is a persistent kitchen-operations agent: pantry state, dietary preferences, meal planning, shopping gaps, product discovery, and a **mock/reversible cart** over **MCP 2025-11-25 Streamable HTTP**. One tool (`kitchen_run`) orchestrates the full loop against durable SQLite household memory and structured media cards.
 
-AWS credentials are **optional**. Without `AWS_REGION` + `BEDROCK_MODEL_ID`, `meal_plan` uses a deterministic stub so local demos and Docker still work offline.
+**Safety:** cart draft/confirm never places a real Amazon order or moves money.
 
+| | |
+|---|---|
+| **Devpost** | https://devpost.com/software/pantrypilot-sytrm1 |
+| **Demo video** | https://www.youtube.com/watch?v=U24ZL9LqIsw |
+| **Repo** | https://github.com/burbanodev-lab/pantrypilot-mcp |
+| **Status** | Devpost **SUBMITTED** (2026-09-11) · primary track **Alexa+** · mini-challenges **AWS Builder** + **Open Source** |
 
+AWS credentials are **optional**. Without `AWS_REGION` + `BEDROCK_MODEL_ID`, `meal_plan` uses a deterministic stub so local demos and Docker work offline. Live Bedrock (`source: bedrock`) is an optional enhancement, not required to judge.
 
-## GenAI Open Agent 2026
+## Judge Quick Start
 
-- **Track intent:** 05 Real-World Industry Agents (household kitchen ops); backup 04 Persistent Memory
-- **Baseline tag:** `baseline/pre-genai-2026-10-14` — see [`PREEXISTING.md`](./PREEXISTING.md)
-- **Prep trunk:** `main` (historical prep branches `genai/open-agent-2026` + companion-evals were merged; do not reopen)
-- **Submission packet:** [`SUBMISSION_GENAI.md`](./SUBMISSION_GENAI.md)
-- **Durable memory:** SQLite via `sql.js` at `DATABASE_PATH` (default `./data/pantrypilot.sqlite`)
-- **Agent entrypoint:** MCP tool `kitchen_run`
-- **Resources / prompts:** `pantry://agent/overview`, `pantry://household/{id}`, prompts `use_up_expiring` + `weekly_kitchen`
-- **Companion UI:** `apps/companion` served at `/companion/` (static MCP client + media cards)
-- **Evals / failure modes:** `npm run eval` · [`FAILURE_MODES.md`](./FAILURE_MODES.md)
-- **Live MCP (MCPize):** https://pantrypilot.mcpize.run — `/health` is public; `/mcp` requires Bearer (expected)
-- **One-command:** `docker compose up --build` (volume `pantrypilot-data` mounts `/data`)
+```bash
+git clone https://github.com/burbanodev-lab/pantrypilot-mcp.git
+cd pantrypilot-mcp
+npm ci
+npm run verify-submission
+npm start
+```
+
+Then open `http://127.0.0.1:3000/companion/` → **Stock sample pantry** → **Run weekly kitchen**.
+
+One-pager for reviewers: [`JUDGES.md`](./JUDGES.md) · full narrative: [`SUBMISSION.md`](./SUBMISSION.md) · failure modes: [`FAILURE_MODES.md`](./FAILURE_MODES.md)
+
+Aggregate check `verify-submission` runs build, submission audit, Alexa add-on check, raw MCP conformance, smoke, judge-check, and evals. No AWS credentials required.
+
+### Docker (optional)
+
+```bash
+docker compose up --build
+# Health: http://127.0.0.1:3000/health
+# Companion: http://127.0.0.1:3000/companion/
+```
+
+Hosted MCP at https://pantrypilot.mcpize.run — `/health` is public; `/mcp` returns **401 Bearer token required** (MCPize gateway). Prefer video + local companion for judging; do not treat the gated `/mcp` URL as the main live demo.
 
 ## Architecture
 
@@ -48,7 +67,7 @@ Alexa+ / MCP client
 | Layer | Role |
 |-------|------|
 | `src/server.ts` | Entry: Streamable HTTP, session map, `/mcp` + `/health` + `/companion/` |
-| `src/tools.ts` | Eleven MCP tools (incl. `kitchen_run`) |
+| `src/tools.ts` | MCP tools (incl. `kitchen_run`) — count from live `tools/list` |
 | `apps/companion/` | Minimal web companion (HTML/JS) calling `kitchen_run` + rendering `mediaCard`s |
 | `evals/` | Scripted happy-path + soft-failure eval (`npm run eval`) |
 | `src/mcp-extras.ts` | MCP resources (`pantry://…`) + prompts (`use_up_expiring`, `weekly_kitchen`) |
@@ -71,6 +90,8 @@ Alexa+ / MCP client
 | `cart_draft` / `cart_confirm` | Mock cart (no Amazon order); lines carry `mediaCard` |
 | `session_recall` | Session/household context snapshot |
 | `kitchen_run` | Agent loop: pantry → meal_plan → shop → product_search → cart_draft + step log |
+
+Exact tool count is whatever `tools/list` returns (currently **11** including `kitchen_run`); smoke/conformance assert required names rather than a frozen integer.
 
 ### Structured meal + media cards
 
@@ -95,7 +116,7 @@ When **both** are set:
 ```bash
 cd pantrypilot-mcp
 cp .env.example .env   # optional; add Bedrock vars only if you have access
-npm install
+npm ci
 npm run build
 ```
 
@@ -133,7 +154,7 @@ Compose forwards `AWS_*` / `BEDROCK_MODEL_ID` from the host environment; the ima
 
 ## Smoke test
 
-After `npm install`, the smoke script **starts an ephemeral server**, runs MCP `initialize` + `tools/list`, then exits:
+After `npm ci`, the smoke script **starts an ephemeral server**, runs MCP `initialize` + `tools/list`, then exits:
 
 ```bash
 npm run smoke
@@ -142,7 +163,7 @@ npm run smoke
 Expected output includes:
 
 - `OK initialize protocolVersion=2025-11-25`
-- `OK tools/list count=10` (or more)
+- `OK tools/list count=<N>` (non-empty; required tools present)
 - `SMOKE PASSED`
 
 Against an already-running server you can also point a custom client at `http://127.0.0.1:3000/mcp` using `@modelcontextprotocol/sdk` `Client` + `StreamableHTTPClientTransport`.
@@ -157,13 +178,14 @@ npm start
 npm run eval
 # PASS happy_path_pantry_meal_cart
 # PASS failure_cart_confirm_without_draft
+# (+ allergen / budget gate evals)
 ```
 
 See [`FAILURE_MODES.md`](./FAILURE_MODES.md) for judge-oriented failure documentation.
 
 ## Demo script
 
-**Preferred (GenAI / companion):** open `/companion/` → Stock sample pantry → **Run weekly kitchen** (`kitchen_run`).
+**Preferred (companion):** open `/companion/` → Stock sample pantry → **Run weekly kitchen** (`kitchen_run`).
 
 **Tool-by-tool (Alexa+ / MCP client):**
 
@@ -179,7 +201,16 @@ See [`FAILURE_MODES.md`](./FAILURE_MODES.md) for judge-oriented failure document
 - Package: `@modelcontextprotocol/sdk` **v1.30.x** (monolith). Its `LATEST_PROTOCOL_VERSION` is `2025-11-25`.
 - Transport: `StreamableHTTPServerTransport` with `enableJsonResponse: true` and session IDs.
 - Optional LLM: `@aws-sdk/client-bedrock-runtime` (Converse).
-- See `FRICTION_LOG.md` for scaffold friction vs the newer v2 / `2026-07-28` packages and Bedrock notes.
+- See [`FRICTION_LOG.md`](./FRICTION_LOG.md) for scaffold friction vs the newer v2 / `2026-07-28` packages and Bedrock notes.
+
+## Appendix — GenAI Open Agent 2026 (separate / parallel context)
+
+> Not the Amazon submission above the fold. Kept for continuity with a later competition prep trunk.
+
+- **Track intent:** 05 Real-World Industry Agents (household kitchen ops); backup 04 Persistent Memory
+- **Baseline tag:** `baseline/pre-genai-2026-10-14` — see [`PREEXISTING.md`](./PREEXISTING.md)
+- **Submission packet:** [`SUBMISSION_GENAI.md`](./SUBMISSION_GENAI.md)
+- Resources / prompts and durable memory listed above are already part of the Amazon-facing product surface.
 
 ## License
 

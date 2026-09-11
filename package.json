@@ -1,9 +1,11 @@
 {
   "name": "pantrypilot-mcp",
   "version": "0.1.0",
-  "description": "PantryPilot MCP kitchen agent — Streamable HTTP tools, kitchen_run loop, SQLite memory, web companion, and evals (Amazon Alexa+ / GenAI Open Agent).",
+  "description": "PantryPilot MCP \u2014 Alexa+ kitchen agent over Streamable HTTP (MCP 2025-11-25): kitchen_run, SQLite memory, media cards, optional Bedrock Converse, companion UI.",
   "type": "module",
-  "engines": { "node": ">=20" },
+  "engines": {
+    "node": ">=20"
+  },
   "main": "dist/server.js",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -18,7 +20,13 @@
     "dev": "tsx src/server.ts",
     "eval": "tsx evals/run.ts"
   },
-  "keywords": ["mcp", "model-context-protocol", "alexa", "pantry", "hackathon"],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "alexa",
+    "pantry",
+    "hackathon"
+  ],
   "author": "Samuel Burbano",
   "license": "MIT",
   "dependencies": {
