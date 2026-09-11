@@ -28,8 +28,10 @@ This is not a single-turn Bedrock wrapper. Bedrock output participates in a stat
 - Project repository: https://github.com/burbanodev-lab/pantrypilot-mcp
 - GitHub username: `burbanodev-lab`
 - License: MIT
+- Repository created: **2026-09-10 17:27:16 UTC**, during the official hackathon submission window (2026-08-31 through 2026-10-23).
+- GitHub repository metadata detects the license as **MIT / SPDX MIT** and the repository is public.
 
-The contribution includes the MCP server, companion experience, raw-wire conformance tests, evaluation harness, persistence layer, Bedrock integration, Docker setup, failure-mode documentation, friction log, and judge-ready submission metadata.
+This is a **new open-source project created during the hackathon window**, matching the Open Source mini-challenge requirement rather than relying on a pre-existing repository. The contribution includes the MCP server, companion experience, raw-wire conformance tests, evaluation harness, persistence layer, Bedrock integration, Docker setup, failure-mode documentation, friction log, and judge-ready submission metadata. The repository creation timestamp can be independently verified through GitHub repository metadata.
 
 ## What PantryPilot does
 
@@ -206,7 +208,8 @@ Show CI, Docker, evals, failure modes, and the friction log.
 ## Final submission gates
 
 - [x] Public source repository
-- [x] MIT license
+- [x] MIT license detected by GitHub
+- [x] New open-source repository created during the hackathon submission window
 - [x] Alexa+ runtime requirement: MCP `2025-11-25` over Streamable HTTP
 - [x] Working self-hosted MCP implementation
 - [x] AWS Bedrock integration documented in source
@@ -218,7 +221,7 @@ Show CI, Docker, evals, failure modes, and the friction log.
 - [x] Friction log drafted
 - [x] Alexa+ submission copy drafted
 - [x] AWS Builder mini-challenge copy drafted
-- [x] Open Source mini-challenge metadata drafted
+- [x] Open Source mini-challenge metadata drafted with auditable creation timestamp
 - [x] Judge testing instructions drafted
 - [x] <=3 minute demo storyboard drafted
 - [ ] Capture an authorized live Bedrock-backed run (`source: bedrock`) if available
