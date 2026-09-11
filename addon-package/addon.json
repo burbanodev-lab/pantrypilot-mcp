@@ -1,0 +1,58 @@
+{
+  "manifestVersion": "1.0",
+  "storeListing": {
+    "distributionCountries": ["US"],
+    "locales": {
+      "en-US": {
+        "default": "DEFAULT",
+        "name": { "value": "PantryPilot" },
+        "shortDescription": "A stateful Alexa+ kitchen agent that plans meals, tracks pantry state, finds gaps, and drafts a safe cart.",
+        "fullDescription": "PantryPilot is a stateful kitchen operations add-on for Alexa+. It remembers pantry inventory and household preferences, generates multi-day meal plans, calculates ingredient shortages, discovers matching products, and prepares a reversible cart draft without placing an order. The service exposes a self-hosted MCP server over Streamable HTTP and keeps household context across sessions. PantryPilot is designed around safe, explainable actions: pantry and preference updates are explicit, shopping gaps are derived from stored inventory, and purchase-related output stops at a cart draft so customers stay in control.",
+        "examplePhrases": [
+          "Ask PantryPilot what I can cook with what is already in my pantry",
+          "Ask PantryPilot to plan meals for my household this week",
+          "Ask PantryPilot what groceries I am missing",
+          "Ask PantryPilot to prepare a draft cart for the missing ingredients"
+        ],
+        "privacyAndCompliance": {
+          "privacyPolicyUrl": "https://github.com/burbanodev-lab/pantrypilot-mcp/blob/main/PRIVACY.md",
+          "termsOfUseUrl": "https://github.com/burbanodev-lab/pantrypilot-mcp/blob/main/TERMS.md"
+        },
+        "mediaAssets": {
+          "icons": {
+            "light": [
+              { "size": "72x72", "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/icon-72x72.png" },
+              { "size": "64x64", "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/icon-64x64.png" },
+              { "size": "88x88", "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/icon-88x88.png" },
+              { "size": "126x126", "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/icon-126x126.png" },
+              { "size": "180x180", "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/icon-180x180.png" },
+              { "size": "241x241", "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/icon-241x241.png" }
+            ],
+            "dark": []
+          },
+          "carouselImages": [
+            {
+              "uri": "https://raw.githubusercontent.com/burbanodev-lab/pantrypilot-mcp/main/assets/alexa/carousel-600x900.png",
+              "altText": "PantryPilot workflow: pantry state, meal planning, shopping gaps, and safe cart draft",
+              "size": "600x900"
+            }
+          ],
+          "bannerImages": []
+        }
+      }
+    }
+  },
+  "integrations": [
+    {
+      "type": "MCP",
+      "config": {
+        "endpoints": {
+          "default": {
+            "type": "HTTPS",
+            "uri": "https://pantrypilot.mcpize.run/mcp"
+          }
+        }
+      }
+    }
+  ]
+}
