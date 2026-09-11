@@ -1,6 +1,6 @@
 # Amazon Developer Hackathon — Rules Compliance Matrix
 
-Verified against the official Devpost overview/rules for **Build, Ship, Shape: Amazon Developer Hackathon** on 2026-09-10.
+Verified against the official Devpost overview/rules for **Build, Ship, Shape: Amazon Developer Hackathon** and current entrant status on 2026-09-11.
 
 Official competition: https://amazonappdev2026.devpost.com/
 Official rules: https://amazonappdev2026.devpost.com/rules
@@ -10,16 +10,22 @@ Official rules: https://amazonappdev2026.devpost.com/rules
 | Item | Official requirement / fact | PantryPilot status |
 |---|---|---|
 | Submission deadline | October 23, 2026 at 12:00 PM Pacific Time | OPEN |
+| Devpost entrant account | Must be able to join/submit | REINSTATED — Devpost Support removed suspension flag on 2026-09-11 |
+| Hackathon registration | Entrant must join the hackathon | COMPLETE — registration confirmation received 2026-09-11 |
 | Primary track | Alexa+ | SELECTED |
 | Alexa+ 1st prize | US$25,000 cash + US$15,000 AWS credits | TARGET |
 | Alexa+ 2nd prize | US$15,000 cash + US$5,000 AWS credits | ELIGIBLE IF RANKED |
+| Alexa+ 3rd prize | US$4,000 cash + US$1,000 AWS credits | ELIGIBLE IF RANKED |
 | AWS Builder mini challenge | US$5,000 cash + US$5,000 AWS credits | TARGETED |
 | Open Source mini challenge | US$5,000 cash + US$5,000 AWS credits | TARGETED |
 | Multiple prizes | One track prize + one mini-challenge prize maximum per project | ACKNOWLEDGED |
 | Purchase/payment to enter | Not required | COMPLIANT |
 | Public repository | Required as part of working demo/code submission | COMPLIANT |
 | Product feedback | Required | DRAFTED in `SUBMISSION.md` / `FRICTION_LOG.md` |
-| Working demo | Required | IMPLEMENTED; recording pending |
+| Friction log | Optional; can add up to 10% judging bonus | DRAFTED |
+| Working demo | Required | IMPLEMENTED; public recording pending |
+| Demo video | YouTube or Vimeo, public, English, under 3 minutes | PENDING |
+| Final Devpost submission | Must be submitted before deadline | NOT YET INDEPENDENTLY EVIDENCED |
 
 ## Alexa+ technical compliance
 
@@ -32,6 +38,13 @@ Official rules: https://amazonappdev2026.devpost.com/rules
 | Stateful agent workflow | `kitchen_run` + SQLite household state |
 | Reproducible judging without credentials | deterministic fallback + Docker + judge scripts |
 | Safe external actions | cart remains a mock draft/confirm flow; no real purchase or funds transfer |
+| Household safety gates | allergen filtering + budget ceilings merged to `main` with eval coverage |
+
+## Judging fit
+
+The official Alexa+ judging guidance explicitly treats an agentic workflow that orchestrates services, maintains state across sessions, supports purchasing-style capabilities, and uses media/cards as creative rather than a basic MCP wrapper. PantryPilot is intentionally structured around those signals: durable household state, multi-step orchestration, cart drafting, and structured media cards.
+
+The four equally weighted judging criteria are Tech Implementation, Design, Potential Impact, and Quality of the Idea. The friction log can add up to a 10% bonus during downselection, so `FRICTION_LOG.md` should be included in the final submission.
 
 ## Mini-challenge compliance
 
@@ -41,7 +54,7 @@ PantryPilot incorporates Amazon Bedrock Runtime through `@aws-sdk/client-bedrock
 
 ### Open Source
 
-PantryPilot is a public MIT-licensed project created/expanded during the hackathon window. Submission metadata includes the public repository/contribution URL and description of the work.
+PantryPilot is a public MIT-licensed project created during the hackathon window. Submission metadata includes the public repository/contribution URL, GitHub username, creation timestamp, and description of the work. This is stronger than a documentation-only contribution: the repository contains the working MCP server, companion experience, tests/evals, persistence, Bedrock integration, Docker packaging, safety gates, and judge tooling.
 
 ## Prize verification and payment path
 
@@ -55,10 +68,12 @@ Therefore this repository and its status reporting must keep these concepts sepa
 
 ## Remaining external gates
 
-- [ ] Register for the hackathon in Devpost under the authorized entrant account.
+- [x] Devpost account reinstated.
+- [x] Register for the hackathon under the authorized entrant account.
 - [ ] Capture a live authorized Bedrock-backed run if available, without exposing credentials.
-- [ ] Record and publish the public demo video within the competition limit.
-- [ ] Complete and submit the Devpost entry before October 23, 2026 at 12:00 PM PT.
-- [ ] Preserve submission confirmation/URL as evidence.
+- [ ] Record and publish the public English demo video under three minutes.
+- [ ] Complete all Devpost project/submission fields, including Alexa+, AWS Builder, Open Source, product feedback, friction log, repository URL, testing instructions, and pre-existing-work answer if presented.
+- [ ] Submit the Devpost entry before October 23, 2026 at 12:00 PM PT.
+- [ ] Preserve submission confirmation/project URL as evidence and only then mark pipeline `SUBMITTED`.
 
-These gates require the entrant's authenticated Devpost/AWS/video-host context and must not be represented as complete until independently evidenced.
+These remaining gates require the entrant's authenticated Devpost/AWS/video-host context and must not be represented as complete until independently evidenced.
