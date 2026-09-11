@@ -127,6 +127,20 @@ A second challenge was judge reproducibility. A full LLM run needs an authorized
 
 A production version could deploy the agent runtime with Amazon Bedrock AgentCore, replace the mock product/cart layer with explicitly authorized commerce integrations, add scheduled background runs, and notify the household only when a meaningful decision is required.
 
+## Devpost demo video
+
+**Preferred final video:** record a new public video of at most 5 minutes using the storyboard below. It should visibly show the Strands source, `judge-check`, a real Strands run, the PantryPilot flow, safety boundaries and architecture.
+
+**Temporary submission fallback if the final Strands video is not ready:**
+
+https://www.youtube.com/watch?v=U24ZL9LqIsw
+
+Use this existing public PantryPilot demo only to avoid missing the submission deadline. It demonstrates the working PantryPilot product flow and may be used for the problem / audience / why-it-matters portion of the pitch, but **it predates the Agents for Humans Strands layer and does not demonstrate Strands Agents SDK**. Do not describe it as a Strands demo. Replace it with the dedicated Strands video before the submission deadline if possible.
+
+## AWS Builder ID — required human data
+
+Devpost requires an AWS Builder ID for this hackathon. Enter **the exact email address used to create the entrant's AWS Builder ID**. Do not infer this from the Devpost, GitHub, AWS account-root, or project email. The Builder ID email must be supplied or verified by the entrant at `profile.aws.amazon.com`.
+
 ## Demo video storyboard (max 5 minutes)
 
 **0:00–0:30 — Problem / audience / why it matters**  
