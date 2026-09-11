@@ -3,7 +3,14 @@ import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { matchProductForIngredient, searchCatalog, toProductMediaCard } from './catalog.js';
 import { generateMealPlanWithBedrock, isBedrockConfigured } from './bedrock.js';
+import {
+  enforceBudgetCeiling,
+  filterMealPlanByAllergens,
+  filterProductsByAllergens,
+  productAllergenHits
+} from './gates.js';
 import { buildMealPlanStub } from './meals.js';
+import { enrichFromOpenFoodFacts } from './openfoodfacts.js';
 import {
   bindSession,
   getOrCreateHousehold,
@@ -77,8 +84,9 @@ async function resolveMealPlan(
   const servings = h.prefs.servings ?? 2;
   const diet = h.prefs.diet ?? [];
 
+  const allergies = h.prefs.allergies ?? [];
   if (!isBedrockConfigured()) {
-    return { plan: buildMealPlanStub(days, servings, diet), source: 'stub' };
+    return { plan: buildMealPlanStub(days, servings, diet, allergies), source: 'stub' };
   }
 
   try {
@@ -93,7 +101,7 @@ async function resolveMealPlan(
     const message = err instanceof Error ? err.message : String(err);
     console.warn('[pantrypilot] Bedrock meal_plan failed; using stub:', message);
     return {
-      plan: buildMealPlanStub(days, servings, diet),
+      plan: buildMealPlanStub(days, servings, diet, allergies),
       source: 'stub',
       bedrockError: message
     };
@@ -103,16 +111,27 @@ async function resolveMealPlan(
 function draftCartFromShopList(h: HouseholdState): {
   cart: NonNullable<HouseholdState['cart']>;
   mediaCards: MediaCard[];
+  allergenBlocked: Array<{ name: string; allergenHits: ReturnType<typeof productAllergenHits> }>;
 } {
   const source = h.shopList.map(s => ({
     name: s.name,
     quantity: Math.max(1, Math.ceil(s.quantity))
   }));
+  const allergies = h.prefs.allergies ?? [];
+  const allergenBlocked: Array<{
+    name: string;
+    allergenHits: ReturnType<typeof productAllergenHits>;
+  }> = [];
 
   const cartLines: CartLine[] = [];
   for (const line of source) {
     const product = matchProductForIngredient(line.name);
     if (!product) continue;
+    const hits = productAllergenHits(product, allergies);
+    if (hits.length) {
+      allergenBlocked.push({ name: product.title, allergenHits: hits });
+      continue;
+    }
     const mediaCard = toProductMediaCard(product, line.quantity);
     cartLines.push({
       asin: product.asin,
@@ -133,7 +152,11 @@ function draftCartFromShopList(h: HouseholdState): {
     currency: 'USD' as const,
     createdAt: new Date().toISOString()
   };
-  return { cart, mediaCards: cartLines.map(l => l.mediaCard!).filter(Boolean) };
+  return {
+    cart,
+    mediaCards: cartLines.map(l => l.mediaCard!).filter(Boolean),
+    allergenBlocked
+  };
 }
 
 type KitchenStep = {
@@ -271,15 +294,36 @@ export function registerTools(server: McpServer): void {
       const h = getOrCreateHousehold(hid);
       bindSession(extra.sessionId, hid);
       const n = days ?? 3;
-      const { plan, source, bedrockError } = await resolveMealPlan(n, h);
+      const { plan: rawPlan, source, bedrockError } = await resolveMealPlan(n, h);
+      const { plan, gate: allergenGate } = filterMealPlanByAllergens(
+        rawPlan,
+        h.prefs.allergies
+      );
+      if (allergenGate.code === 'ALLERGEN_BLOCKED') {
+        return jsonContent({
+          ok: false,
+          error: allergenGate.message,
+          code: allergenGate.code,
+          householdId: hid,
+          days: n,
+          source,
+          bedrockConfigured: isBedrockConfigured(),
+          ...(bedrockError ? { bedrockError } : {}),
+          allergenGate,
+          mealPlan: [],
+          mediaCards: []
+        });
+      }
       h.mealPlan = plan;
       touch(h);
       return jsonContent({
+        ok: true,
         householdId: hid,
         days: n,
         source,
         bedrockConfigured: isBedrockConfigured(),
         ...(bedrockError ? { bedrockError } : {}),
+        allergenGate,
         mealPlan: plan,
         mediaCards: plan.map(s => s.mediaCard).filter(Boolean)
       });
@@ -297,7 +341,12 @@ export function registerTools(server: McpServer): void {
       const h = getOrCreateHousehold(hid);
       bindSession(extra.sessionId, hid);
       if (h.mealPlan.length === 0) {
-        h.mealPlan = buildMealPlanStub(3, h.prefs.servings ?? 2, h.prefs.diet ?? []);
+        h.mealPlan = buildMealPlanStub(
+          3,
+          h.prefs.servings ?? 2,
+          h.prefs.diet ?? [],
+          h.prefs.allergies ?? []
+        );
       }
       h.shopList = buildShopList(h);
       touch(h);
@@ -309,17 +358,40 @@ export function registerTools(server: McpServer): void {
     'product_search',
     {
       description:
-        'Search the mock product catalog. Returns card fields (asin, title, price, image, detail URL) plus structured mediaCard payloads suitable for Alexa shopping cards.',
+        'Search the mock product catalog. Hard-filters products that conflict with household allergies when householdId is provided. Optionally enriches the top hit via Open Food Facts (offline fallback). Returns card fields plus mediaCard payloads.',
       inputSchema: {
         query: z.string().describe('Search query'),
-        limit: z.number().int().min(1).max(20).optional()
+        limit: z.number().int().min(1).max(20).optional(),
+        householdId: householdIdField,
+        enrich: z
+          .boolean()
+          .optional()
+          .describe('If true, enrich top product via Open Food Facts (offline fallback)')
       }
     },
-    async ({ query, limit }) => {
-      const products = searchCatalog(query, limit ?? 5);
+    async ({ query, limit, householdId, enrich }, extra) => {
+      const hid = resolveHouseholdId(householdId, extra.sessionId);
+      const h = getOrCreateHousehold(hid);
+      bindSession(extra.sessionId, hid);
+      const raw = searchCatalog(query, limit ?? 5);
+      const { products, gate: allergenGate } = filterProductsByAllergens(
+        raw,
+        h.prefs.allergies
+      );
+      let offEnrichment = null;
+      if (enrich && products[0]) {
+        offEnrichment = await enrichFromOpenFoodFacts(products[0].title);
+      } else if (enrich && !products[0] && raw[0]) {
+        // Still allow offline enrichment of blocked top hit for transparency
+        offEnrichment = await enrichFromOpenFoodFacts(raw[0].title);
+      }
       return jsonContent({
+        ok: allergenGate.code !== 'ALLERGEN_BLOCKED',
         query,
+        householdId: hid,
         count: products.length,
+        allergenGate,
+        ...(offEnrichment ? { openFoodFacts: offEnrichment } : {}),
         products: products.map(p => ({
           asin: p.asin,
           title: p.title,
@@ -327,6 +399,7 @@ export function registerTools(server: McpServer): void {
           category: p.category,
           priceCents: p.priceCents,
           currency: p.currency,
+          allergens: p.allergens ?? [],
           imageUrl: p.imageUrl,
           detailPageUrl: p.detailPageUrl,
           rating: p.rating,
@@ -343,7 +416,7 @@ export function registerTools(server: McpServer): void {
     'cart_draft',
     {
       description:
-        'Draft a mock cart from the current shopping list (or explicit lines). No Amazon API — local stub only. Lines include mediaCard fields for Alexa+ UI.',
+        'Draft a mock cart from the current shopping list (or explicit lines). Hard-filters allergen-conflicting products and rejects drafts that exceed prefs.budgetCents. No Amazon API — local stub only.',
       inputSchema: {
         householdId: householdIdField,
         lines: z
@@ -361,12 +434,24 @@ export function registerTools(server: McpServer): void {
       const hid = resolveHouseholdId(householdId, extra.sessionId);
       const h = getOrCreateHousehold(hid);
       bindSession(extra.sessionId, hid);
+      const allergies = h.prefs.allergies ?? [];
+      let cartLines: CartLine[] = [];
+      let mediaCards: MediaCard[] = [];
+      const allergenBlocked: Array<{
+        name: string;
+        allergenHits: ReturnType<typeof productAllergenHits>;
+      }> = [];
+
       if (lines?.length) {
-        const cartLines: CartLine[] = [];
         for (const line of lines) {
           const qty = line.quantity ?? 1;
           const product = matchProductForIngredient(line.name);
           if (!product) continue;
+          const hits = productAllergenHits(product, allergies);
+          if (hits.length) {
+            allergenBlocked.push({ name: product.title, allergenHits: hits });
+            continue;
+          }
           const mediaCard = toProductMediaCard(product, qty);
           cartLines.push({
             asin: product.asin,
@@ -378,27 +463,46 @@ export function registerTools(server: McpServer): void {
             mediaCard
           });
         }
-        const totalCents = cartLines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
-        h.cart = {
-          cartId: `cart_${randomUUID().slice(0, 8)}`,
-          status: 'draft',
-          lines: cartLines,
-          totalCents,
-          currency: 'USD',
-          createdAt: new Date().toISOString()
-        };
-        touch(h);
+        mediaCards = cartLines.map(l => l.mediaCard!).filter(Boolean);
+      } else {
+        const drafted = draftCartFromShopList(h);
+        cartLines = drafted.cart.lines;
+        mediaCards = drafted.mediaCards;
+        allergenBlocked.push(...drafted.allergenBlocked);
+      }
+
+      const totalCents = cartLines.reduce((sum, l) => sum + l.priceCents * l.quantity, 0);
+      const budgetGate = enforceBudgetCeiling(totalCents, h.prefs);
+      if (!budgetGate.ok) {
         return jsonContent({
+          ok: false,
+          error: budgetGate.message,
+          code: budgetGate.code,
           householdId: hid,
-          cart: h.cart,
-          mediaCards: cartLines.map(l => l.mediaCard)
+          budgetGate,
+          allergenBlocked,
+          cart: null,
+          mediaCards: []
         });
       }
 
-      const { cart, mediaCards } = draftCartFromShopList(h);
-      h.cart = cart;
+      h.cart = {
+        cartId: `cart_${randomUUID().slice(0, 8)}`,
+        status: 'draft',
+        lines: cartLines,
+        totalCents,
+        currency: 'USD',
+        createdAt: new Date().toISOString()
+      };
       touch(h);
-      return jsonContent({ householdId: hid, cart: h.cart, mediaCards });
+      return jsonContent({
+        ok: true,
+        householdId: hid,
+        budgetGate,
+        allergenBlocked,
+        cart: h.cart,
+        mediaCards
+      });
     }
   );
 
@@ -470,7 +574,7 @@ export function registerTools(server: McpServer): void {
     'kitchen_run',
     {
       description:
-        'Agent loop: orchestrate pantry_query → meal_plan → shop_list_build → product_search (top shortfalls) → cart_draft in one call. Returns step log with timings plus final cart and mediaCards. Prefer this for weekly kitchen demos.',
+        'Agent loop: pantry_query → meal_plan → shop_list_build → product_search → cart_draft. Hard allergen filter on meals/products and budget ceiling on cart draft. Returns step log, gates, cart, mediaCards.',
       inputSchema: {
         householdId: householdIdField,
         days: z
@@ -485,7 +589,7 @@ export function registerTools(server: McpServer): void {
           .int()
           .nonnegative()
           .optional()
-          .describe('Optional budget hint stored on prefs'),
+          .describe('Optional budget ceiling (cents) stored on prefs and enforced on cart_draft'),
         goal: z
           .enum(['weekly', 'use_expiring'])
           .optional()
@@ -528,9 +632,10 @@ export function registerTools(server: McpServer): void {
         }
       }
 
-      // 2) meal_plan
+      // 2) meal_plan (+ allergen hard gate)
       let mealSource: 'bedrock' | 'stub' = 'stub';
       let bedrockError: string | undefined;
+      let allergenGate: ReturnType<typeof filterMealPlanByAllergens>['gate'] | null = null;
       {
         const t0 = Date.now();
         try {
@@ -555,14 +660,28 @@ export function registerTools(server: McpServer): void {
               });
             }
           }
-          h.mealPlan = plan;
-          touch(h);
-          steps.push({
-            tool: 'meal_plan',
-            ok: true,
-            ms: Date.now() - t0,
-            detail: `days=${n} source=${mealSource} slots=${plan.length} goal=${runGoal}`
-          });
+          const filtered = filterMealPlanByAllergens(plan, h.prefs.allergies);
+          allergenGate = filtered.gate;
+          plan = filtered.plan;
+          if (allergenGate.code === 'ALLERGEN_BLOCKED') {
+            h.mealPlan = [];
+            touch(h);
+            steps.push({
+              tool: 'meal_plan',
+              ok: false,
+              ms: Date.now() - t0,
+              error: allergenGate.message ?? 'ALLERGEN_BLOCKED'
+            });
+          } else {
+            h.mealPlan = plan;
+            touch(h);
+            steps.push({
+              tool: 'meal_plan',
+              ok: true,
+              ms: Date.now() - t0,
+              detail: `days=${n} source=${mealSource} slots=${plan.length} goal=${runGoal} allergen=${allergenGate.code}`
+            });
+          }
         } catch (err) {
           steps.push({
             tool: 'meal_plan',
@@ -578,7 +697,12 @@ export function registerTools(server: McpServer): void {
         const t0 = Date.now();
         try {
           if (h.mealPlan.length === 0) {
-            h.mealPlan = buildMealPlanStub(n, h.prefs.servings ?? 2, h.prefs.diet ?? []);
+            h.mealPlan = buildMealPlanStub(
+              n,
+              h.prefs.servings ?? 2,
+              h.prefs.diet ?? [],
+              h.prefs.allergies ?? []
+            );
           }
           h.shopList = buildShopList(h);
           touch(h);
@@ -598,21 +722,26 @@ export function registerTools(server: McpServer): void {
         }
       }
 
-      // 4) product_search for top shortfalls
-      const productHits: { query: string; count: number }[] = [];
+      // 4) product_search for top shortfalls (allergen-filtered)
+      const productHits: { query: string; count: number; blocked: number }[] = [];
       {
         const t0 = Date.now();
         try {
           const queries = h.shopList.slice(0, 5).map(s => s.name);
           for (const q of queries) {
-            const products = searchCatalog(q, 3);
-            productHits.push({ query: q, count: products.length });
+            const raw = searchCatalog(q, 3);
+            const { products, gate } = filterProductsByAllergens(raw, h.prefs.allergies);
+            productHits.push({
+              query: q,
+              count: products.length,
+              blocked: gate.blockedCount
+            });
           }
           steps.push({
             tool: 'product_search',
             ok: true,
             ms: Date.now() - t0,
-            detail: `queries=${queries.length} hits=${productHits.reduce((a, b) => a + b.count, 0)}`
+            detail: `queries=${queries.length} hits=${productHits.reduce((a, b) => a + b.count, 0)} blocked=${productHits.reduce((a, b) => a + b.blocked, 0)}`
           });
         } catch (err) {
           steps.push({
@@ -624,21 +753,33 @@ export function registerTools(server: McpServer): void {
         }
       }
 
-      // 5) cart_draft
+      // 5) cart_draft (+ budget hard gate)
       let mediaCards: MediaCard[] = [];
+      let budgetGate: ReturnType<typeof enforceBudgetCeiling> | null = null;
       {
         const t0 = Date.now();
         try {
           const drafted = draftCartFromShopList(h);
-          h.cart = drafted.cart;
-          mediaCards = drafted.mediaCards;
-          touch(h);
-          steps.push({
-            tool: 'cart_draft',
-            ok: true,
-            ms: Date.now() - t0,
-            detail: `cartId=${h.cart.cartId} lines=${h.cart.lines.length} totalCents=${h.cart.totalCents}`
-          });
+          budgetGate = enforceBudgetCeiling(drafted.cart.totalCents, h.prefs);
+          if (!budgetGate.ok) {
+            mediaCards = [];
+            steps.push({
+              tool: 'cart_draft',
+              ok: false,
+              ms: Date.now() - t0,
+              error: budgetGate.message ?? 'BUDGET_EXCEEDED'
+            });
+          } else {
+            h.cart = drafted.cart;
+            mediaCards = drafted.mediaCards;
+            touch(h);
+            steps.push({
+              tool: 'cart_draft',
+              ok: true,
+              ms: Date.now() - t0,
+              detail: `cartId=${h.cart.cartId} lines=${h.cart.lines.length} totalCents=${h.cart.totalCents} budget=${budgetGate.code}`
+            });
+          }
         } catch (err) {
           steps.push({
             tool: 'cart_draft',
@@ -663,13 +804,15 @@ export function registerTools(server: McpServer): void {
         mealPlanSource: mealSource,
         bedrockConfigured: isBedrockConfigured(),
         ...(bedrockError ? { bedrockError } : {}),
+        ...(allergenGate ? { allergenGate } : {}),
+        ...(budgetGate ? { budgetGate } : {}),
         steps,
         totalMs: Date.now() - started,
         pantryCount: h.pantry.size,
         mealPlan: h.mealPlan,
         shopList: h.shopList,
         productHits,
-        cart: h.cart ?? null,
+        cart: ok ? (h.cart ?? null) : (budgetGate && !budgetGate.ok ? null : h.cart ?? null),
         mediaCards: [
           ...h.mealPlan.map(s => s.mediaCard).filter(Boolean),
           ...mediaCards

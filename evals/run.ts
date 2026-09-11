@@ -48,7 +48,7 @@ async function main() {
           diet: ['omnivore'],
           allergies: ['peanuts'],
           servings: 2,
-          budgetCents: 4500
+          budgetCents: 50000
         }
       });
       await client.callTool({
@@ -65,7 +65,7 @@ async function main() {
       const run = parseJson(
         await client.callTool({
           name: 'kitchen_run',
-          arguments: { householdId: hid, days: 2, goal: 'weekly', budgetCents: 4500 }
+          arguments: { householdId: hid, days: 2, goal: 'weekly', budgetCents: 50000 }
         })
       );
       const steps = (run.steps as { tool: string; ok: boolean }[]) ?? [];
@@ -378,6 +378,180 @@ async function main() {
     } catch (err) {
       results.push({
         name: 'resources_and_prompts_kitchen',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+
+    // --- Hard gate: allergen blocks milk product suggestions ---
+    try {
+      const hid = 'eval-allergen-block';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: {
+          householdId: hid,
+          diet: ['omnivore'],
+          allergies: ['milk'],
+          servings: 2
+        }
+      });
+      const search = parseJson(
+        await client.callTool({
+          name: 'product_search',
+          arguments: { householdId: hid, query: 'milk', limit: 5, enrich: true }
+        })
+      );
+      const gate = search.allergenGate as {
+        code?: string;
+        blockedCount?: number;
+        keptCount?: number;
+      };
+      const products = (search.products as unknown[]) ?? [];
+      const off = search.openFoodFacts as { source?: string; query?: string } | undefined;
+      const meal = parseJson(
+        await client.callTool({
+          name: 'meal_plan',
+          arguments: { householdId: hid, days: 1 }
+        })
+      );
+      const plan = (meal.mealPlan as { title: string; ingredients: { name: string }[] }[]) ?? [];
+      const milkInPlan = plan.some(
+        (s) =>
+          /milk|yogurt|dairy/i.test(s.title) ||
+          s.ingredients.some((i) => /milk|yogurt|cheese|butter/i.test(i.name))
+      );
+      const ok =
+        search.ok === false &&
+        (gate?.code === 'ALLERGEN_BLOCKED' || (gate?.blockedCount ?? 0) > 0) &&
+        products.length === 0 &&
+        !milkInPlan &&
+        !!off &&
+        (off.source === 'openfoodfacts' || off.source === 'offline_stub');
+      results.push({
+        name: 'allergen_gate_blocks_milk',
+        ok,
+        detail: ok
+          ? `productGate=${gate?.code} mealSlots=${plan.length} off=${off?.source}`
+          : `ok=${search.ok} gate=${JSON.stringify(gate)} products=${products.length} milkInPlan=${milkInPlan} off=${JSON.stringify(off)?.slice(0, 120)}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'allergen_gate_blocks_milk',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    // --- Hard gate: budget ceiling rejects over-budget cart ---
+    try {
+      const hid = 'eval-budget-exceeded';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: {
+          householdId: hid,
+          diet: ['omnivore'],
+          allergies: [],
+          servings: 2,
+          budgetCents: 100
+        }
+      });
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [{ name: 'salt', quantity: 1, unit: 'tsp' }]
+        }
+      });
+      const run = parseJson(
+        await client.callTool({
+          name: 'kitchen_run',
+          arguments: { householdId: hid, days: 2, goal: 'weekly', budgetCents: 100 }
+        })
+      );
+      const budgetGate = run.budgetGate as {
+        code?: string;
+        ok?: boolean;
+        totalCents?: number;
+        budgetCents?: number;
+      };
+      const cartStep = ((run.steps as { tool: string; ok: boolean; error?: string }[]) ?? []).find(
+        (s) => s.tool === 'cart_draft'
+      );
+      const ok =
+        run.ok === false &&
+        budgetGate?.code === 'BUDGET_EXCEEDED' &&
+        budgetGate?.ok === false &&
+        cartStep?.ok === false &&
+        run.cart == null &&
+        typeof budgetGate?.totalCents === 'number' &&
+        (budgetGate.totalCents as number) > 100;
+      results.push({
+        name: 'budget_gate_rejects_over_ceiling',
+        ok,
+        detail: ok
+          ? `totalCents=${budgetGate!.totalCents} budget=100 cartStepFail=1`
+          : `ok=${run.ok} gate=${JSON.stringify(budgetGate)} cartStep=${JSON.stringify(cartStep)} cart=${run.cart}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'budget_gate_rejects_over_ceiling',
+        ok: false,
+        detail: err instanceof Error ? err.message : String(err)
+      });
+    }
+
+    // --- Hard gates happy path: peanut allergy + ample budget still drafts cart ---
+    try {
+      const hid = 'eval-gates-happy';
+      await client.callTool({
+        name: 'prefs_set',
+        arguments: {
+          householdId: hid,
+          diet: ['omnivore'],
+          allergies: ['peanuts'],
+          servings: 2,
+          budgetCents: 50000
+        }
+      });
+      await client.callTool({
+        name: 'pantry_upsert',
+        arguments: {
+          householdId: hid,
+          items: [
+            { name: 'eggs', quantity: 12, unit: 'count' },
+            { name: 'milk', quantity: 4, unit: 'cup' },
+            { name: 'rice', quantity: 4, unit: 'cup' }
+          ]
+        }
+      });
+      const run = parseJson(
+        await client.callTool({
+          name: 'kitchen_run',
+          arguments: { householdId: hid, days: 1, goal: 'weekly', budgetCents: 50000 }
+        })
+      );
+      const allergenGate = run.allergenGate as { code?: string } | undefined;
+      const budgetGate = run.budgetGate as { code?: string; ok?: boolean } | undefined;
+      const cart = run.cart as { lines?: unknown[]; totalCents?: number } | null;
+      const ok =
+        run.ok === true &&
+        (allergenGate?.code === 'ALLERGEN_OK' || allergenGate?.code === 'ALLERGEN_FILTERED') &&
+        budgetGate?.code === 'BUDGET_OK' &&
+        budgetGate?.ok === true &&
+        !!cart &&
+        Array.isArray(cart.lines) &&
+        cart.lines.length > 0;
+      results.push({
+        name: 'gates_happy_path_allergen_ok_budget_ok',
+        ok,
+        detail: ok
+          ? `allergen=${allergenGate?.code} budget=${budgetGate?.code} lines=${cart!.lines!.length} total=${cart!.totalCents}`
+          : `ok=${run.ok} allergen=${JSON.stringify(allergenGate)} budget=${JSON.stringify(budgetGate)} cart=${!!cart}`
+      });
+    } catch (err) {
+      results.push({
+        name: 'gates_happy_path_allergen_ok_budget_ok',
         ok: false,
         detail: err instanceof Error ? err.message : String(err)
       });
