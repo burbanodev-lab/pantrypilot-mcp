@@ -34,7 +34,7 @@ async function main() {
 
     const run = await client.callTool({
       name: 'kitchen_run',
-      arguments: { householdId: 'judge-demo', days: 2, goal: 'reduce food waste' }
+      arguments: { householdId: 'judge-demo', days: 2, goal: 'use_expiring' }
     });
     assert(!run.isError, 'kitchen_run returned an MCP error');
 
