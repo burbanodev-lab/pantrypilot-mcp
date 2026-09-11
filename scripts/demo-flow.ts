@@ -39,6 +39,23 @@ function structured(result: Awaited<ReturnType<Client['callTool']>>): Record<str
   }
 }
 
+function hasPersistedDemoState(recall: Record<string, unknown> | undefined): boolean {
+  if (!recall) return false;
+  const pantryCount = recall.pantryCount;
+  const prefs = recall.prefs;
+  const mealPlanDays = recall.mealPlanDays;
+
+  return (
+    typeof pantryCount === 'number' &&
+    pantryCount >= 2 &&
+    prefs !== null &&
+    typeof prefs === 'object' &&
+    (prefs as Record<string, unknown>).servings === 2 &&
+    Array.isArray(mealPlanDays) &&
+    mealPlanDays.length >= 1
+  );
+}
+
 async function main() {
   const { port, host } = await startServer(0, '127.0.0.1');
   const transport = new StreamableHTTPClientTransport(new URL(`http://${host}:${port}/mcp`));
@@ -60,6 +77,7 @@ async function main() {
 
     console.log(`PantryPilot Alexa+ demo — MCP ${transport.protocolVersion}`);
     let finalRecall: Record<string, unknown> | undefined;
+    let recallCount = 0;
 
     for (const [name, args] of calls) {
       const result = await client.callTool({ name, arguments: args });
@@ -71,18 +89,21 @@ async function main() {
         const source = payload.source ?? payload.modelSource ?? payload.provider;
         if (typeof source === 'string') evidence.kitchenRunSource = source;
       }
-      if (name === 'session_recall') finalRecall = payload;
+      if (name === 'session_recall') {
+        recallCount += 1;
+        if (recallCount === 2) finalRecall = payload;
+      }
 
       console.log(`\n=== ${name} ===`);
       console.log(JSON.stringify(payload ?? result.content, null, 2));
     }
 
-    evidence.persistentRecallObserved = Boolean(finalRecall && Object.keys(finalRecall).length > 0);
+    evidence.persistentRecallObserved = hasPersistedDemoState(finalRecall);
     if (evidence.kitchenRunSource === 'unknown') {
       throw new Error('kitchen_run completed but demo could not verify its model source');
     }
     if (!evidence.persistentRecallObserved) {
-      throw new Error('demo could not verify persisted household/session recall');
+      throw new Error('demo recall did not prove persisted pantry, preferences, and meal-plan state');
     }
 
     console.log('\n=== JUDGE EVIDENCE SUMMARY ===');
