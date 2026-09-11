@@ -38,6 +38,9 @@ jobs:
       - name: TypeScript build
         run: npm run build
 
+      - name: Submission compliance audit
+        run: npm run submission-audit
+
       - name: Raw MCP Streamable HTTP conformance
         run: npm run mcp-conformance
         env:
