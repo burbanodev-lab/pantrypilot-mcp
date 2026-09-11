@@ -1,5 +1,9 @@
 # Friction Log
 
+Amazon Developer Hackathon (Alexa+ / MCP / Bedrock) entries first. Later GenAI Open Agent prep notes are in an appendix and are **not** part of the Amazon judging packet.
+
+---
+
 ## 2026-09-10 — Scaffolding Streamable HTTP MCP for Alexa+ (PantryPilot)
 
 **Context:** Greenfield TypeScript MCP server for Amazon Developer Hackathon Alexa+ track. Requirement: `@modelcontextprotocol/sdk` with `protocolVersion` **2025-11-25**.
@@ -10,7 +14,7 @@
 - Choosing **stateful sessions + `enableJsonResponse: true`** made smoke testing with `Client` + `StreamableHTTPClientTransport` straightforward (JSON initialize/result instead of SSE parsing quirks).
 - Binding Docker to `0.0.0.0` requires setting `ALLOWED_HOSTS` — `createMcpExpressApp` enables DNS-rebinding Host checks for localhost by default and warns when binding all interfaces without an allow-list.
 
-**Workaround / decision:** Stay on `@modelcontextprotocol/sdk@^1.30.0` (not v2) so initialize negotiates `2025-11-25` natively. Use JSON-response Streamable HTTP with per-session transport map. Household domain state is a separate in-memory map keyed by `householdId` (and optionally bound to MCP `sessionId`), so app state survives independent of transport mode.
+**Workaround / decision:** Stay on `@modelcontextprotocol/sdk@^1.30.0` (not v2) so initialize negotiates `2025-11-25` natively. Use JSON-response Streamable HTTP with per-session transport map. Household domain state is a separate map keyed by `householdId` (and optionally bound to MCP `sessionId`), so app state survives independent of transport mode.
 
 **Gap vs v2:** Not using `@modelcontextprotocol/server` `createMcpHandler` / fully stateless 2026-07-28 wire format. If Alexa+ later requires that revision, migrate with the official v1→v2 codemod and re-verify protocol negotiation.
 
@@ -28,30 +32,43 @@
 - Normalize/validate Bedrock JSON into `MealSlot`s (`normalizeMealSlot`) before writing state; enrich both stub and Bedrock slots with `description` / `tags` / `estimatedMinutes` / `mediaCard`.
 - Docker Compose forwards optional `AWS_*` / `BEDROCK_MODEL_ID` from the host; secrets stay out of the image and git (`.env` gitignored; `.env.example` placeholders only).
 
-**Still rough:** No live Bedrock integration test in `npm run smoke` (would need real credentials and a provisioned model). Structured output / tool-use on Converse would harden JSON reliability further; deferred to keep the MVP path simple.
+**Still rough:** No live Bedrock integration test in `npm run smoke` (would need real credentials and a provisioned model). Structured output / tool-use on Converse would harden JSON reliability further; deferred to keep the MVP path simple. Authorized `source: bedrock` capture remains optional evidence, not a blocker for the credential-free judge path.
 
-## 2026-09-10 — GenAI prep: SQLite via sql.js + kitchen_run (no native toolchain)
+## 2026-09-11 — Hosted MCP Bearer gate (MCPize)
 
-**Context:** GenAI Open Agent 2026 prep on `/workspace/pantrypilot-mcp` (`burbanodev-lab`). Plan required durable SQLite + `kitchen_run` agent loop before the Oct 15 window, tagged at `baseline/pre-genai-2026-10-14`.
-
-**What happened:**
-- `better-sqlite3@13` requires Node ≥22 and a local `node-gyp`/`make` toolchain. This box is Node **20.19.2** without `make`/g++ and without root for `apt-get`. Install failed at `node-gyp rebuild`.
-- Plan explicitly allows **sql.js** as the SQLite alternative. `sql.js` WASM loads with `locateFile` via `createRequire` → `sql.js/dist`, persists with `db.export()` + atomic rename to `DATABASE_PATH` (default `./data/pantrypilot.sqlite`).
-- Circular type imports (`db.ts` ↔ `state.ts`) stay safe because DB uses `import type` only from state; runtime init is `await initDatabase()` inside `startServer` before listen.
-- Smoke must set an isolated temp `DATABASE_PATH` so parallel agents sharing the box do not clobber `./data/pantrypilot.sqlite`.
-
-**Workaround / decision:** Ship `sql.js` + `@types/sql.js`; keep API surface identical to a native SQLite store (tables: households, pantry_items, session_map). Debounced flush (50ms) + `persistDatabaseNow` on SIGINT/SIGTERM. Document in PREEXISTING.md that baseline tag still had in-memory-only state; SQLite + `kitchen_run` are post-tag branch work.
-
-**Still rough:** sql.js is single-process and rewrite-the-file on persist — fine for solo Docker volume demos, not multi-replica. Restart-across-process proof is manual (kill PID / new process same `DATABASE_PATH`); smoke covers in-process tool path only. Native `better-sqlite3` can replace later if the runtime gains build tools or Node 22 + prebuilds.
-
-## 2026-09-11 — GenAI prep: MCP resources + prompts (no new scored-window dependency)
-
-**Context:** AM readiness pass. Historical `genai/open-agent-2026` remote branch already merged + deleted; PR #5 adversarial pass-2 also merged to `main`. Remaining GenAI PREEXISTING gap called out MCP resources/prompts.
+**Context:** Public URL `https://pantrypilot.mcpize.run` for demo convenience.
 
 **What happened:**
-- Added `src/mcp-extras.ts`: static `pantry://agent/overview`, template `pantry://household/{householdId}` (list + complete), prompts `use_up_expiring` and `weekly_kitchen`.
-- Companion/gateway 401 on `https://pantrypilot.mcpize.run/companion` is **not** a PantryPilot bug — MCPize returns `www-authenticate: Bearer` / `Bearer token required`. `/health` remains public 200.
-- Docs still pointed at deleted scored branch; corrected to `main` + baseline tag + `SUBMISSION_GENAI.md`.
+- `/health` returns 200 without credentials.
+- `/mcp` (and bare path) returns **401** with `Bearer token required` / `www-authenticate: Bearer` — gateway OAuth, not an application bug.
+- Advertising that URL as a “live demo” for unauthenticated judges creates a dead end.
 
-**Workaround / decision:** Keep Open Food Facts / CSV ingest and hard allergen gates for the Oct 15–20 scored window. Resources/prompts land as pre-window prep so demo clients can discover memory + guided loops before build day.
+**Workaround / decision:** Document local `npm start` / `docker compose` + companion UI and the published YouTube demo as the primary judge path. Keep hosted `/health` as a liveness signal only.
 
+## 2026-09-10 — Durable SQLite without a native compiler toolchain
+
+**Context:** Household state must survive process restart for Alexa+ session recall demos.
+
+**What happened:**
+- `better-sqlite3` required a newer Node and/or `node-gyp`/`make` toolchain unavailable on the build box.
+- `sql.js` WASM loads with `locateFile`, persists with `db.export()` + atomic rename to `DATABASE_PATH`.
+
+**Workaround / decision:** Ship `sql.js` + `@types/sql.js`; Docker volume `pantrypilot-data` mounts `/data`. Accept single-process rewrite-on-persist for the hackathon demo (not multi-replica production).
+
+---
+
+# Appendix — GenAI Open Agent 2026 prep (non-Amazon)
+
+> These entries document parallel preparation for a **different** competition window. Amazon judges can ignore this appendix.
+
+## 2026-09-10 — GenAI prep: SQLite via sql.js + kitchen_run
+
+**Context:** GenAI Open Agent 2026 prep; plan required durable SQLite + `kitchen_run` before the Oct 15 window, tagged at `baseline/pre-genai-2026-10-14`.
+
+**Notes:** Same `sql.js` decision as above; smoke isolates temp `DATABASE_PATH` so parallel agents sharing a box do not clobber local DB. See [`PREEXISTING.md`](./PREEXISTING.md) / [`SUBMISSION_GENAI.md`](./SUBMISSION_GENAI.md).
+
+## 2026-09-11 — GenAI prep: MCP resources + prompts
+
+**Context:** AM readiness pass for GenAI resources/prompts gap.
+
+**Notes:** Added `src/mcp-extras.ts` (`pantry://agent/overview`, `pantry://household/{id}`, prompts `use_up_expiring` / `weekly_kitchen`). Hosted companion 401 is MCPize gateway auth (see Amazon section above). Further Open Food Facts / scored-window work is out of scope for Amazon judge closeout.

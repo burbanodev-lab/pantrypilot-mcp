@@ -97,7 +97,13 @@ No AWS credentials are required for the main judging path.
 ```bash
 git clone https://github.com/burbanodev-lab/pantrypilot-mcp.git
 cd pantrypilot-mcp
-npm install
+npm ci
+npm run verify-submission
+```
+
+Or step-by-step:
+
+```bash
 npm run build
 npm run mcp-conformance
 npm run smoke
@@ -205,6 +211,12 @@ Show CI, Docker, evals, failure modes, and the friction log.
 - A live Bedrock call requires the developer/judge to provide authorized AWS configuration.
 - `sql.js` persistence targets a single-process demo deployment rather than multi-replica production scale.
 
+## Public links (judge-facing)
+
+- **Devpost (SUBMITTED 2026-09-11):** https://devpost.com/software/pantrypilot-sytrm1
+- **Demo video (published):** https://www.youtube.com/watch?v=U24ZL9LqIsw
+- **Repository:** https://github.com/burbanodev-lab/pantrypilot-mcp
+
 ## Final submission gates
 
 - [x] Public source repository
@@ -212,7 +224,7 @@ Show CI, Docker, evals, failure modes, and the friction log.
 - [x] New open-source repository created during the hackathon submission window
 - [x] Alexa+ runtime requirement: MCP `2025-11-25` over Streamable HTTP
 - [x] Working self-hosted MCP implementation
-- [x] AWS Bedrock integration documented in source
+- [x] AWS Bedrock integration documented in source (optional live Converse path; deterministic stub for judging)
 - [x] README setup/run instructions
 - [x] Docker packaging
 - [x] MCP SDK smoke test
@@ -224,6 +236,6 @@ Show CI, Docker, evals, failure modes, and the friction log.
 - [x] Open Source mini-challenge metadata drafted with auditable creation timestamp
 - [x] Judge testing instructions drafted
 - [x] <=3 minute demo storyboard drafted
-- [ ] Capture an authorized live Bedrock-backed run (`source: bedrock`) if available
-- [ ] Record and publish public YouTube/Vimeo demo under three minutes
-- [ ] Complete Devpost submission form before deadline
+- [x] Record and publish public YouTube demo under three minutes — https://www.youtube.com/watch?v=U24ZL9LqIsw
+- [x] Complete Devpost submission form — https://devpost.com/software/pantrypilot-sytrm1 (confirmation 2026-09-11)
+- [ ] Optional: capture an authorized live Bedrock-backed run (`source: bedrock`) if available — **not** an eligibility blocker; credential-free stub path is the primary judge path
