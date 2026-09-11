@@ -15,6 +15,7 @@ import { fileURLToPath } from 'node:url';
 import { existsSync } from 'node:fs';
 import { initDatabase, persistDatabaseNow, resolveDatabasePath } from './db.js';
 import { registerTools } from './tools.js';
+import { registerResourcesAndPrompts } from './mcp-extras.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -61,10 +62,11 @@ export function createPantryPilotServer(): McpServer {
     { name: 'pantrypilot-mcp', version: '0.1.0' },
     {
       instructions:
-        'PantryPilot helps manage household pantry inventory, preferences, meal plans, shopping lists, and mock cart drafts over MCP. Prefer kitchen_run for a full pantry→meal→shop→cart agent loop. State is durable in SQLite (DATABASE_PATH). Pass householdId on tools when multi-home; otherwise session binding is used. meal_plan uses Amazon Bedrock when AWS_REGION and BEDROCK_MODEL_ID are set; otherwise a deterministic stub. Product and meal responses include structured mediaCard payloads.'
+        'PantryPilot helps manage household pantry inventory, preferences, meal plans, shopping lists, and mock cart drafts over MCP. Prefer kitchen_run for a full pantry→meal→shop→cart agent loop. Read pantry:// resources and prompts use_up_expiring / weekly_kitchen when available. State is durable in SQLite (DATABASE_PATH). Pass householdId on tools when multi-home; otherwise session binding is used. meal_plan uses Amazon Bedrock when AWS_REGION and BEDROCK_MODEL_ID are set; otherwise a deterministic stub. Product and meal responses include structured mediaCard payloads.'
     }
   );
   registerTools(server);
+  registerResourcesAndPrompts(server);
   return server;
 }
 

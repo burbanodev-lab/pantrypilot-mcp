@@ -8,6 +8,7 @@ import {
   dbBindSession,
   dbClearAll,
   dbEnsureHousehold,
+  dbListHouseholdIds,
   dbLoadHousehold,
   dbResolveSession,
   dbSaveHousehold,
@@ -234,6 +235,16 @@ export function touch(h: HouseholdState): void {
 export function serializePantry(h: HouseholdState): PantryItem[] {
   return [...h.pantry.values()].sort((a, b) => a.name.localeCompare(b.name));
 }
+
+/** Known household ids from memory cache + SQLite (for MCP resource listing). */
+export function listKnownHouseholdIds(): string[] {
+  const ids = new Set<string>([...households.keys()]);
+  if (isDatabaseReady()) {
+    for (const id of dbListHouseholdIds()) ids.add(id);
+  }
+  return [...ids].sort();
+}
+
 
 /** Test helper: wipe all in-memory + SQLite state. */
 export function __resetStateForTests(): void {

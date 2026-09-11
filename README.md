@@ -12,11 +12,14 @@ AWS credentials are **optional**. Without `AWS_REGION` + `BEDROCK_MODEL_ID`, `me
 
 - **Track intent:** 05 Real-World Industry Agents (household kitchen ops); backup 04 Persistent Memory
 - **Baseline tag:** `baseline/pre-genai-2026-10-14` — see [`PREEXISTING.md`](./PREEXISTING.md)
-- **Scored branch:** `genai/open-agent-2026`
+- **Prep trunk:** `main` (historical prep branches `genai/open-agent-2026` + companion-evals were merged; do not reopen)
+- **Submission packet:** [`SUBMISSION_GENAI.md`](./SUBMISSION_GENAI.md)
 - **Durable memory:** SQLite via `sql.js` at `DATABASE_PATH` (default `./data/pantrypilot.sqlite`)
 - **Agent entrypoint:** MCP tool `kitchen_run`
+- **Resources / prompts:** `pantry://agent/overview`, `pantry://household/{id}`, prompts `use_up_expiring` + `weekly_kitchen`
 - **Companion UI:** `apps/companion` served at `/companion/` (static MCP client + media cards)
 - **Evals / failure modes:** `npm run eval` · [`FAILURE_MODES.md`](./FAILURE_MODES.md)
+- **Live MCP (MCPize):** https://pantrypilot.mcpize.run — `/health` is public; `/mcp` requires Bearer (expected)
 - **One-command:** `docker compose up --build` (volume `pantrypilot-data` mounts `/data`)
 
 ## Architecture
@@ -48,6 +51,7 @@ Alexa+ / MCP client
 | `src/tools.ts` | Eleven MCP tools (incl. `kitchen_run`) |
 | `apps/companion/` | Minimal web companion (HTML/JS) calling `kitchen_run` + rendering `mediaCard`s |
 | `evals/` | Scripted happy-path + soft-failure eval (`npm run eval`) |
+| `src/mcp-extras.ts` | MCP resources (`pantry://…`) + prompts (`use_up_expiring`, `weekly_kitchen`) |
 | `src/state.ts` / `src/db.ts` | Household pantry / prefs / plan / cart + SQLite durability + `MediaCard` types |
 | `src/meals.ts` | Deterministic meal-plan stub + slot enrichment |
 | `src/bedrock.ts` | Optional Bedrock Converse meal_plan path |

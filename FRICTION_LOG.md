@@ -43,3 +43,15 @@
 **Workaround / decision:** Ship `sql.js` + `@types/sql.js`; keep API surface identical to a native SQLite store (tables: households, pantry_items, session_map). Debounced flush (50ms) + `persistDatabaseNow` on SIGINT/SIGTERM. Document in PREEXISTING.md that baseline tag still had in-memory-only state; SQLite + `kitchen_run` are post-tag branch work.
 
 **Still rough:** sql.js is single-process and rewrite-the-file on persist — fine for solo Docker volume demos, not multi-replica. Restart-across-process proof is manual (kill PID / new process same `DATABASE_PATH`); smoke covers in-process tool path only. Native `better-sqlite3` can replace later if the runtime gains build tools or Node 22 + prebuilds.
+
+## 2026-09-11 — GenAI prep: MCP resources + prompts (no new scored-window dependency)
+
+**Context:** AM readiness pass. Historical `genai/open-agent-2026` remote branch already merged + deleted; PR #5 adversarial pass-2 also merged to `main`. Remaining GenAI PREEXISTING gap called out MCP resources/prompts.
+
+**What happened:**
+- Added `src/mcp-extras.ts`: static `pantry://agent/overview`, template `pantry://household/{householdId}` (list + complete), prompts `use_up_expiring` and `weekly_kitchen`.
+- Companion/gateway 401 on `https://pantrypilot.mcpize.run/companion` is **not** a PantryPilot bug — MCPize returns `www-authenticate: Bearer` / `Bearer token required`. `/health` remains public 200.
+- Docs still pointed at deleted scored branch; corrected to `main` + baseline tag + `SUBMISSION_GENAI.md`.
+
+**Workaround / decision:** Keep Open Food Facts / CSV ingest and hard allergen gates for the Oct 15–20 scored window. Resources/prompts land as pre-window prep so demo clients can discover memory + guided loops before build day.
+
