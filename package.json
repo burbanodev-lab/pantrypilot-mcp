@@ -12,6 +12,7 @@
     "mcp-conformance": "tsx scripts/mcp-conformance.ts",
     "judge-check": "tsx scripts/judge-check.ts",
     "submission-audit": "tsx scripts/submission-audit.ts",
+    "verify-submission": "npm run build && npm run submission-audit && npm run mcp-conformance && npm run smoke && npm run judge-check && npm run eval",
     "demo": "tsx scripts/demo-flow.ts",
     "dev": "tsx src/server.ts",
     "eval": "tsx evals/run.ts"
