@@ -47,12 +47,13 @@ async function main() {
       submissionMetadataPresent: true
     }, null, 2));
   } finally {
+    // Never call process.exit() here: doing so masks exceptions thrown above and
+    // makes a broken judge path look green in CI. Let failures reach main().catch.
     await client.close().catch(() => undefined);
-    process.exit(0);
   }
 }
 
 main().catch(error => {
   console.error('JUDGE_CHECK_FAILED', error);
-  process.exit(1);
+  process.exitCode = 1;
 });
