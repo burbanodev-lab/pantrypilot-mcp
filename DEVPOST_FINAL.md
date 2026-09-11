@@ -2,19 +2,20 @@
 
 ## Current pipeline
 
-`WORKING → SUBMITTED` is the only priority.
+`SUBMITTED → REVIEW → REWARDED → PAID`
 
-Do not mark `SUBMITTED` until Devpost returns a project/submission confirmation URL or equivalent evidence.
+Devpost submission was independently confirmed by email on **2026-09-11 19:33:46 UTC** with subject **“Submission confirmed: PantryPilot”**.
 
 ## Final URLs
 
 - Hackathon: https://amazonappdev2026.devpost.com/
+- Devpost project: https://devpost.com/software/pantrypilot-sytrm1
 - Repository: https://github.com/burbanodev-lab/pantrypilot-mcp
 - YouTube channel: https://www.youtube.com/@burbanodev
 - Demo video: https://www.youtube.com/watch?v=U24ZL9LqIsw
 - Live MCP health/demo reference: https://pantrypilot.mcpize.run
 
-Before pressing final Submit, visually confirm the YouTube demo is **Public**, **English**, and **under 3:00**. The automated crawler could not reliably read YouTube metadata for this video, so those three properties are not independently asserted here.
+The public Devpost URL exists and Devpost has confirmed the submission. Search-engine indexing may lag, so absence from public search results is not evidence that the submission is missing.
 
 ## Devpost project fields
 
@@ -60,16 +61,20 @@ Then open `http://127.0.0.1:3000/companion/`, choose **Stock sample pantry**, an
 
 Expected evidence includes MCP `2025-11-25` negotiation, tool discovery, persistent household state, `kitchen_run` orchestration, shopping gaps, media cards, cart draft, recall, allergen filtering, and budget ceilings.
 
-## Required narrative/evidence to include
+## Post-submit quality checks
 
-- Product feedback from `SUBMISSION.md`.
-- Friction log: `FRICTION_LOG.md`.
-- Alexa+ technical evidence: self-hosted MCP, Streamable HTTP, stateful orchestration, media cards, purchasing-style draft workflow.
-- AWS Builder evidence: `@aws-sdk/client-bedrock-runtime` + Converse integration; live Bedrock capture is desirable but not required for the credential-free judging path unless the form explicitly requires runtime proof.
-- Open Source evidence: public MIT repository created during the hackathon window, with working implementation rather than documentation-only changes.
-- Pre-existing work answer: PantryPilot was created during the Amazon hackathon window; do not claim unrelated later GenAI competition work as part of Amazon eligibility.
+These are not blockers to `SUBMITTED`, but should be verified in the editable Devpost project while edits remain allowed:
 
-## Final checklist
+- Confirm the demo video renders and remains Public, English, and under 3:00.
+- Confirm Alexa+ is the primary track and AWS Builder + Open Source are selected where allowed.
+- Confirm the GitHub repository/contribution URL is present and clickable.
+- Confirm Product Feedback and the friction log evidence are visible in the submitted answers.
+- Confirm the Story makes the stateful MCP workflow obvious within the first screenful.
+- Confirm screenshots/gallery media show the companion UI, pantry state, `kitchen_run` result, shopping gaps/cart draft, and protocol/test evidence.
+- Confirm “Built With” includes the strongest judge-relevant technologies: Alexa+, MCP, TypeScript, Node.js, Amazon Bedrock, AWS SDK, SQLite/sql.js, Docker.
+- Confirm “Try it out” includes the GitHub repository and any judge-accessible live/demo endpoint that does not expose secrets.
+
+## Submission evidence
 
 - [x] Devpost account reinstated
 - [x] Amazon Developer Hackathon registration confirmed
@@ -81,13 +86,9 @@ Expected evidence includes MCP `2025-11-25` negotiation, tool discovery, persist
 - [x] Product feedback prepared
 - [x] Friction log prepared
 - [x] Demo video URL supplied
-- [ ] Confirm demo Public + English + <3:00
-- [ ] Paste all Devpost fields
-- [ ] Select Alexa+ + AWS Builder + Open Source where allowed
-- [ ] Accept entrant terms only through the authorized human account when Devpost requires personal acceptance
-- [ ] Press final Submit
-- [ ] Capture final Devpost project/submission URL
-- [ ] Change pipeline to `SUBMITTED`
+- [x] Devpost project URL supplied
+- [x] Final submission confirmed by Devpost email
+- [x] Pipeline changed to `SUBMITTED`
 
 ## Cash accounting
 
