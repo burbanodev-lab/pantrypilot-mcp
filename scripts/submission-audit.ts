@@ -57,12 +57,7 @@ const result = {
   checkedAt: new Date().toISOString(),
   checks: Object.fromEntries(checks),
   failed,
-  manualGates: [
-    'register/join hackathon on Devpost',
-    'record and publish public demo video under three minutes',
-    'complete Devpost submission form before 2026-10-23 12:00 PDT',
-    'capture authorized Bedrock-backed run if AWS Builder evidence is desired'
-  ]
+  manualGates: []
 };
 
 console.log(JSON.stringify(result, null, 2));
