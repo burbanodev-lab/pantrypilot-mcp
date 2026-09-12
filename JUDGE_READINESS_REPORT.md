@@ -1,24 +1,27 @@
 # PantryPilot — Judge Readiness Report
 
-**Branch:** `grok/judge-closeout`  
-**Base:** `origin/main` @ `cf677e3`  
-**Report time:** 2026-09-11 ~14:48 America/Bogota (UTC-5)  
+**Branch:** `main`
+
+**Amazon closeout baseline:** `a1184d7`
+
+**Last verified:** 2026-09-12 ~05:36 America/Bogota (UTC-5)
+
 **Directive:** [`JUDGE_CLOSEOUT_GROK.md`](./JUDGE_CLOSEOUT_GROK.md)
 
 ## Summary
 
-Repository docs are Amazon Alexa+-first; GenAI Open Agent material demoted to appendix. Automated `npm ci` + `npm run verify-submission` **PASS**. Hosted MCP Bearer **401** is expected and documented (not advertised as the primary live demo). Docker unavailable on this runner → Docker marked **UNVERIFIED**. Authenticated Devpost form fields (track/mini-challenges/gallery) remain for the parent browser agent / Samuel.
+Repository docs remain Amazon Alexa+-first. The current `main` branch is two additive commits ahead of the Amazon closeout baseline; those commits only add the isolated `agents-for-humans/` package and its workflow, without changing Amazon judge-facing files or runtime behavior. Automated submission verification **PASS**. The public Devpost entry, repository, demo video, and hosted health endpoint respond successfully. Hosted MCP Bearer **401** remains expected and documented. The submission is confirmed **SUBMITTED**, and the gallery is reported in place.
 
 ## Requirement table
 
 | Requirement | Result | Notes |
 |-------------|--------|-------|
-| Devpost public entry accessible | **UNVERIFIED** | Logged-out curl/WebFetch → **403** from this environment (WAF/bot block). URL known: https://devpost.com/software/pantrypilot-sytrm1. Parent must open in browser. |
-| Submission still confirmed after edits | **UNVERIFIED** | Repo/docs record SUBMITTED 2026-09-11; this closeout did **not** edit Devpost. Parent must confirm status still SUBMITTED after any gallery/story edits. |
+| Devpost public entry accessible | **PASS** | Logged-out HTTP check returned **200**: https://devpost.com/software/pantrypilot-sytrm1. |
+| Submission still confirmed after edits | **PASS** | Devpost confirmation email and current project status record **SUBMITTED** on 2026-09-11. |
 | Alexa+ selected | **UNVERIFIED** | Claimed in repo/`RULES_COMPLIANCE.md`; needs authenticated Devpost verification. |
 | AWS Builder selected/entered | **UNVERIFIED** | Same — parent browser. |
 | Open Source selected/entered | **UNVERIFIED** | Same — parent browser. |
-| Video public / English / &lt;3:00 | **PASS** (length) / **UNVERIFIED** (English narration content) | YouTube oEmbed + HTTP 200 logged-out. Local `assets/demo-amazon.mp4` duration **~35.6s**. Title: “PantryPilot — Alexa+ MCP kitchen agent demo…”. Narration language not independently audited here. |
+| Video public / English / &lt;3:00 | **PASS** (availability/length) / **UNVERIFIED** (English narration content) | Public YouTube page + oEmbed return HTTP 200; live metadata reports **36s**. Title: “PantryPilot — Alexa+ MCP kitchen agent demo…”. Narration language was not independently audited here. |
 | Repo public | **PASS** | https://github.com/burbanodev-lab/pantrypilot-mcp → HTTP 200 |
 | MIT license | **PASS** | `LICENSE` present; raw GitHub LICENSE HTTP 200 |
 | `npm ci` | **PASS** | Clean install, 0 vulnerabilities |
@@ -30,7 +33,7 @@ Repository docs are Amazon Alexa+-first; GenAI Open Agent material demoted to ap
 | Allergy gate | **PASS** | Eval `allergen_gate_blocks_milk` PASS |
 | Budget gate | **PASS** | Eval `budget_gate_rejects_over_ceiling` PASS |
 | No secrets observed | **PASS** | `.env` gitignored; only `.env.example` tracked (placeholders). Grep: no live AWS keys/tokens in tree (comment placeholders only) |
-| Judge-facing links open logged out | **MIXED** | Repo **PASS**; YouTube **PASS** (200 + oEmbed); Devpost **UNVERIFIED** (403 from this egress); hosted `/health` **PASS** 200; hosted `/mcp` **401 Bearer** (expected — documented) |
+| Judge-facing links open logged out | **PASS** | Repo, YouTube, Devpost, and hosted `/health` return **200**; hosted `/mcp` returns **401 Bearer** as expected and documented. |
 | Final CI green | **PASS** | PR #10 CI run 34640789547 success (Node 20 + 22 verify-submission). |
 | README Amazon-first + Judge Quick Start | **PASS** | Updated; GenAI section demoted to appendix; Devpost + video linked; mock-cart safety prominent; tool count aligned to live `tools/list` (11) |
 | SUBMISSION.md gates current | **PASS** | Video published + Devpost SUBMITTED checked; live Bedrock optional, not blocker |
@@ -46,14 +49,9 @@ Repository docs are Amazon Alexa+-first; GenAI Open Agent material demoted to ap
 - **New:** `JUDGES.md`, `JUDGE_READINESS_REPORT.md`
 - **Not started:** GenAI Open Agent features / speculative work
 
-## Remaining for parent (browser / Samuel)
+## Remaining safeguards
 
-1. **Devpost authenticated audit** — confirm Alexa+, AWS Builder, Open Source, Built With tags, product feedback + friction evidence, pre-existing-work answers, team fields.
-2. **Gallery** — if empty/weak, upload 4–6 real screenshots (companion, pantry/prefs, kitchen_run chain, safety gates, architecture, CI) — do not fabricate.
-3. **Live app URL** — if form shows `https://pantrypilot.mcpize.run/mcp`, remove or demote (401 Bearer); prefer video + local judge instructions.
-4. **Story polish** — first screenful: problem → agentic solution → proof → safety → impact (per directive §1).
-5. **Re-confirm SUBMITTED** after any Devpost edits (re-submit if Devpost requires it).
-6. Optional: authorized live Bedrock `source: bedrock` capture (nice-to-have, not eligibility blocker).
+No repository blocker remains for judging. Avoid unnecessary submission edits; if Devpost is edited later, confirm that its status still reads **SUBMITTED**. An authorized live Bedrock `source: bedrock` capture remains optional, not an eligibility blocker.
 
 ## HANDOFF FOR BURBANO CASH EXECUTION AGENT
 
